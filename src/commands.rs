@@ -32,10 +32,8 @@ pub enum Command {
 pub enum BgEvent {
     SearchDone { query: String, results: Vec<FileEntry> },
     PasteDone { ok: usize, err: usize, message: String },
-    /// Filesystem changed (debounced). UI should refresh visible tabs.
     FsChanged,
-    /// Async directory listing finished.
-    ListDone { generation: u64, entries: Vec<FileEntry>, error: Option<String> },
+    ListDone { generation: u64, is_pane2: bool, entries: Vec<FileEntry>, error: Option<String> },
 }
 
 pub type BgSender = mpsc::Sender<BgEvent>;
@@ -80,19 +78,10 @@ pub fn spawn_paste(tx: BgSender, paths: Vec<PathBuf>, mode: ClipboardMode, dest_
     });
 }
 
-pub fn spawn_list(
-    tx: BgSender,
-    generation: u64,
-    dir: PathBuf,
-    show_hidden: bool,
-    filter: String,
-    sort_by: crate::config::SortBy,
-    sort_desc: bool,
-) {
+pub fn spawn_list(tx: BgSender, generation: u64, is_pane2: bool, dir: PathBuf, show_hidden: bool, filter: String, sort_by: crate::config::SortBy, sort_desc: bool) {
     thread::spawn(move || {
         let (mut entries, error) = crate::tab::Tab::list_blocking(&dir, show_hidden, &filter);
-        // sort in worker thread
         crate::tab::Tab::sort_entries(&mut entries, sort_by, sort_desc);
-        let _ = tx.send(BgEvent::ListDone { generation, entries, error });
+        let _ = tx.send(BgEvent::ListDone { generation, is_pane2, entries, error });
     });
 }
