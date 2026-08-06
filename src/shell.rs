@@ -42,14 +42,8 @@ pub fn normalize_path_input(input: &str) -> std::path::PathBuf {
 mod windows_shell {
     use super::*;
     use std::os::windows::ffi::OsStrExt;
-    use windows::core::HSTRING;
-    use windows::Win32::UI::Shell::SHGetFileInfoW;
-    use windows::Win32::UI::Shell::{SHFILEINFOW, SHGFI_DISPLAYNAME, SHGFI_TYPENAME, SHGFI_USEFILEATTRIBUTES};
     use windows::Win32::Storage::FileSystem::{FILE_ATTRIBUTE_DIRECTORY, FILE_ATTRIBUTE_NORMAL};
-
-    fn to_wide(s: &str) -> Vec<u16> {
-        std::ffi::OsStr::new(s).encode_wide().chain(std::iter::once(0)).collect()
-    }
+    use windows::Win32::UI::Shell::{SHFILEINFOW, SHGFI_TYPENAME, SHGFI_USEFILEATTRIBUTES, SHGetFileInfoW};
 
     /// OS display type name, e.g. "テキスト ドキュメント", "PNG ファイル"
     pub fn os_type_name(path: &Path) -> Option<String> {
@@ -58,7 +52,7 @@ mod windows_shell {
         let ret = unsafe {
             SHGetFileInfoW(
                 windows::core::PCWSTR(w.as_ptr()),
-                FILE_ATTRIBUTE_NORMAL.0 as u32,
+                FILE_ATTRIBUTE_NORMAL,
                 Some(&mut info),
                 std::mem::size_of::<SHFILEINFOW>() as u32,
                 SHGFI_TYPENAME | SHGFI_USEFILEATTRIBUTES,
@@ -80,7 +74,7 @@ mod windows_shell {
         let ret = unsafe {
             SHGetFileInfoW(
                 windows::core::PCWSTR(w.as_ptr()),
-                FILE_ATTRIBUTE_DIRECTORY.0 as u32,
+                FILE_ATTRIBUTE_DIRECTORY,
                 Some(&mut info),
                 std::mem::size_of::<SHFILEINFOW>() as u32,
                 SHGFI_TYPENAME | SHGFI_USEFILEATTRIBUTES,
