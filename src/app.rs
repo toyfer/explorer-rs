@@ -1,3 +1,4 @@
+use std::cell::RefCell;
 use std::collections::{BTreeSet, HashMap};
 use std::path::{Path, PathBuf};
 use std::time::Instant;
@@ -45,7 +46,7 @@ pub struct ExplorerApp {
     listing_p2: bool,
     bg_tx: BgSender,
     bg_rx: BgReceiver,
-    icon_cache: HashMap<String, egui::TextureHandle>,
+    icon_cache: RefCell<HashMap<String, egui::TextureHandle>>,
 }
 
 #[derive(Clone)]
@@ -97,7 +98,7 @@ impl ExplorerApp {
             listing_p2: false,
             bg_tx,
             bg_rx,
-            icon_cache: HashMap::new(),
+            icon_cache: RefCell::new(HashMap::new()),
         };
         app.sync_watchers();
         app.update_preview();
@@ -232,16 +233,16 @@ impl ExplorerApp {
         }
         format!("ext:{ext}")
     }
-    fn get_or_load_icon(&mut self, ctx: &egui::Context, path: &Path, is_dir: bool) -> Option<egui::TextureHandle> {
+    fn get_or_load_icon(&self, ctx: &egui::Context, path: &Path, is_dir: bool) -> Option<egui::TextureHandle> {
         let key = Self::icon_cache_key(path, is_dir);
-        if let Some(h) = self.icon_cache.get(&key) { return Some(h.clone()); }
+        if let Some(h) = self.icon_cache.borrow().get(&key) { return Some(h.clone()); }
         #[cfg(windows)]
         {
             if let Some((rgba, w, h)) = shell::icon_rgba(path, is_dir) {
                 if w > 0 && h > 0 && rgba.len() == (w*h*4) as usize {
                     let img = egui::ColorImage::from_rgba_unmultiplied([w as usize, h as usize], &rgba);
                     let tex = ctx.load_texture(key.clone(), img, egui::TextureOptions::LINEAR);
-                    self.icon_cache.insert(key.clone(), tex.clone());
+                    self.icon_cache.borrow_mut().insert(key.clone(), tex.clone());
                     return Some(tex);
                 }
             }
@@ -287,7 +288,6 @@ impl ExplorerApp {
                 for ev in &i.events {
                     if let egui::Event::Key { key, pressed: true, modifiers, .. } = ev {
                         if modifiers.ctrl || modifiers.command || modifiers.alt { continue; }
-                        // Allow romaji input even when IME is on: map physical keys to chars when Text is empty
                         let ch = match key {
                             egui::Key::A => 'a', egui::Key::B => 'b', egui::Key::C => 'c', egui::Key::D => 'd',
                             egui::Key::E => 'e', egui::Key::F => 'f', egui::Key::G => 'g', egui::Key::H => 'h',
@@ -767,7 +767,10 @@ impl ExplorerApp {
         let row_h=22.0; let num_rows=entries.len().max(1);
         egui_extras::TableBuilder::new(ui).striped(true).resizable(true).cell_layout(egui::Layout::left_to_right(egui::Align::Center)).column(egui_extras::Column::auto().at_least(280.0).resizable(true)).column(egui_extras::Column::auto().at_least(90.0)).column(egui_extras::Column::auto().at_least(140.0)).column(egui_extras::Column::remainder().at_least(70.0)).auto_shrink([false,false]).vscroll(true).header(24.0, |mut header| { header.col(|ui| { let label=header_label("名前", sort_by==SortBy::Name, sort_desc); if ui.selectable_label(false,label).clicked() { sort_clicked=Some(SortBy::Name); } }); header.col(|ui| { let label=header_label("サイズ", sort_by==SortBy::Size, sort_desc); if ui.selectable_label(false,label).clicked() { sort_clicked=Some(SortBy::Size); } }); header.col(|ui| { let label=header_label("更新日時", sort_by==SortBy::Modified, sort_desc); if ui.selectable_label(false,label).clicked() { sort_clicked=Some(SortBy::Modified); } }); header.col(|ui| { let label=header_label("種類", sort_by==SortBy::Type, sort_desc); if ui.selectable_label(false,label).clicked() { sort_clicked=Some(SortBy::Type); } }); }).body(|body| {
             if entries.is_empty() { body.rows(row_h, 1, |mut row| { row.col(|ui| { ui.label("（空のフォルダ）"); }); row.col(|ui| { ui.label("-"); }); row.col(|ui| { ui.label("-"); }); row.col(|ui| { ui.label("-"); }); }); return; }
-            body.rows(row_h, num_rows, |mut row| { let idx=row.index(); let Some(entry)=entries.get(idx) else { return; }; let is_sel=selected.contains(&idx); row.col(|ui| { let ctrl=ui.input(|i| i.modifiers.command || i.modifiers.ctrl); let shift=ui.input(|i| i.modifiers.shift); let tex = self.get_or_load_icon(ui.ctx(), &entry.path, entry.is_dir); ui.horizontal(|ui| { if let Some(t) = tex { ui.image(egui::ImageSource::Texture(egui::load::SizedTexture::new(t.id(), egui::vec2(16.0,16.0)))); } else { ui.label(shell::icon_emoji_for_path(&entry.path, entry.is_dir)); } let label = entry.name.clone(); let resp = ui.selectable_label(is_sel, label); if resp.clicked() { if ctrl { select_action=Some(SelectAction::Toggle(idx)); } else if shift { select_action=Some(SelectAction::Range(idx)); } else { select_action=Some(SelectAction::Only(idx)); } } if resp.double_clicked() { select_action=Some(SelectAction::Only(idx)); if entry.is_dir { open_path=Some(entry.path.clone()); } else { let _=shell::open_with_shell(&entry.path); } } if resp.secondary_clicked() && !selected.contains(&idx) { select_action=Some(SelectAction::Only(idx)); } resp.context_menu(|ui| { if ui.button("開く").clicked() { if entry.is_dir { open_path=Some(entry.path.clone()); } else { let _=shell::open_with_shell(&entry.path); } ui.close_menu(); } if ui.button("Explorerで表示").clicked() { let _ = shell::reveal_in_explorer(&entry.path); ui.close_menu(); } if ui.button("パスをコピー").clicked() { ui.output_mut(|o| o.copied_text=entry.path.display().to_string()); ui.close_menu(); } ui.separator(); if ui.button("コピー (Ctrl+C)").clicked() { cmd=Some(Command::Copy); ui.close_menu(); } if ui.button("切り取り (Ctrl+X)").clicked() { cmd=Some(Command::Cut); ui.close_menu(); } if ui.button("貼り付け (Ctrl+V)").clicked() { cmd=Some(Command::Paste); ui.close_menu(); } ui.separator(); if ui.button("名前変更 (F2)").clicked() { cmd=Some(Command::Rename); ui.close_menu(); } if ui.button("ごみ箱へ (Del)").clicked() { cmd=Some(Command::Delete { permanent: false }); ui.close_menu(); } if ui.button("完全削除 (Shift+Del)").clicked() { cmd=Some(Command::Delete { permanent: true }); ui.close_menu(); } ui.separator(); if ui.button("新しいフォルダ").clicked() { cmd=Some(Command::NewFolder); ui.close_menu(); } if ui.button("全選択 (Ctrl+A)").clicked() { cmd=Some(Command::SelectAll); ui.close_menu(); } }); }); }); row.col(|ui| { ui.label(if entry.is_dir {"-".into()} else {fs_ops::humansize(entry.size)}); }); row.col(|ui| { ui.label(fs_ops::fmt_time(entry.modified)); }); row.col(|ui| { if let Some(t) = shell::os_type_name(&entry.path) { ui.label(t); } else { ui.label(&entry.ext); } }); });
+            body.rows(row_h, num_rows, |mut row| { let idx=row.index(); let Some(entry)=entries.get(idx) else { return; }; let is_sel=selected.contains(&idx); // cache key and texture outside inner borrow
+                let tex = self.get_or_load_icon(row.ctx(), &entry.path, entry.is_dir);
+                let emoji = shell::icon_emoji_for_path(&entry.path, entry.is_dir).to_string();
+                row.col(|ui| { let ctrl=ui.input(|i| i.modifiers.command || i.modifiers.ctrl); let shift=ui.input(|i| i.modifiers.shift); ui.horizontal(|ui| { if let Some(t) = tex.clone() { ui.image(egui::ImageSource::Texture(egui::load::SizedTexture::new(t.id(), egui::vec2(16.0,16.0)))); } else { ui.label(emoji.clone()); } let label = entry.name.clone(); let resp = ui.selectable_label(is_sel, label); if resp.clicked() { if ctrl { select_action=Some(SelectAction::Toggle(idx)); } else if shift { select_action=Some(SelectAction::Range(idx)); } else { select_action=Some(SelectAction::Only(idx)); } } if resp.double_clicked() { select_action=Some(SelectAction::Only(idx)); if entry.is_dir { open_path=Some(entry.path.clone()); } else { let _=shell::open_with_shell(&entry.path); } } if resp.secondary_clicked() && !selected.contains(&idx) { select_action=Some(SelectAction::Only(idx)); } resp.context_menu(|ui| { if ui.button("開く").clicked() { if entry.is_dir { open_path=Some(entry.path.clone()); } else { let _=shell::open_with_shell(&entry.path); } ui.close_menu(); } if ui.button("Explorerで表示").clicked() { let _ = shell::reveal_in_explorer(&entry.path); ui.close_menu(); } if ui.button("パスをコピー").clicked() { ui.output_mut(|o| o.copied_text=entry.path.display().to_string()); ui.close_menu(); } ui.separator(); if ui.button("コピー (Ctrl+C)").clicked() { cmd=Some(Command::Copy); ui.close_menu(); } if ui.button("切り取り (Ctrl+X)").clicked() { cmd=Some(Command::Cut); ui.close_menu(); } if ui.button("貼り付け (Ctrl+V)").clicked() { cmd=Some(Command::Paste); ui.close_menu(); } ui.separator(); if ui.button("名前変更 (F2)").clicked() { cmd=Some(Command::Rename); ui.close_menu(); } if ui.button("ごみ箱へ (Del)").clicked() { cmd=Some(Command::Delete { permanent: false }); ui.close_menu(); } if ui.button("完全削除 (Shift+Del)").clicked() { cmd=Some(Command::Delete { permanent: true }); ui.close_menu(); } ui.separator(); if ui.button("新しいフォルダ").clicked() { cmd=Some(Command::NewFolder); ui.close_menu(); } if ui.button("全選択 (Ctrl+A)").clicked() { cmd=Some(Command::SelectAll); ui.close_menu(); } }); }); }); row.col(|ui| { ui.label(if entry.is_dir {"-".into()} else {fs_ops::humansize(entry.size)}); }); row.col(|ui| { ui.label(fs_ops::fmt_time(entry.modified)); }); row.col(|ui| { if let Some(t) = shell::os_type_name(&entry.path) { ui.label(t); } else { ui.label(&entry.ext); } }); });
         });
         if let Some(s)=sort_clicked { let t=self.tab_for_mut(pane); if t.sort_by==s { t.sort_desc=!t.sort_desc; } else { t.sort_by=s; t.sort_desc=false; } t.sort(); }
         if let Some(a)=select_action { self.active_pane=match pane { PaneId::Tab=>0, PaneId::Pane2=>1, }; let t=self.tab_for_mut(pane); match a { SelectAction::Only(i)=>t.select_only(i), SelectAction::Toggle(i)=>t.toggle_select(i), SelectAction::Range(i)=>t.select_range_to(i), } self.sync_address(); self.update_preview(); }
