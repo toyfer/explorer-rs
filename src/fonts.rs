@@ -149,7 +149,7 @@ fn find_first_font(candidates: &[PathBuf]) -> Option<(PathBuf, Vec<u8>)> {
 /// Returns a short status message for the UI.
 pub fn apply_fonts(ctx: &eframe::egui::Context, config: &AppConfig) -> String {
     let mut fonts = FontDefinitions::default();
-    let mut loaded_name = String::from("egui default (CJK none)");
+    let mut loaded_name = String::from("egui default (CJK なし)");
     let mut has_custom = false;
     let mut has_cjk = false;
 
@@ -168,7 +168,7 @@ pub fn apply_fonts(ctx: &eframe::egui::Context, config: &AppConfig) -> String {
             );
             has_custom = true;
             loaded_name = format!(
-                "custom: {}",
+                "カスタム: {}",
                 path.file_name()
                     .and_then(|s| s.to_str())
                     .unwrap_or("font")
@@ -198,7 +198,7 @@ pub fn apply_fonts(ctx: &eframe::egui::Context, config: &AppConfig) -> String {
                     .to_string();
             }
         } else if !has_custom {
-            loaded_name = "Japanese font not found".into();
+            loaded_name = "日本語フォント未検出".into();
         }
     }
 
@@ -216,7 +216,7 @@ pub fn apply_fonts(ctx: &eframe::egui::Context, config: &AppConfig) -> String {
 
     ctx.set_fonts(fonts);
     apply_text_styles(ctx, config.font_size);
-    format!("font: {loaded_name}")
+    format!("フォント: {loaded_name}")
 }
 
 pub fn apply_text_styles(ctx: &eframe::egui::Context, size: f32) {
@@ -251,14 +251,14 @@ pub fn apply_text_styles(ctx: &eframe::egui::Context, size: f32) {
 
 pub fn preset_label(p: FontPreset) -> &'static str {
     match p {
-        FontPreset::Auto => "Auto (Japanese)",
-        FontPreset::YuGothic => "Yu Gothic",
-        FontPreset::Meiryo => "Meiryo",
-        FontPreset::YuMincho => "Yu Mincho",
-        FontPreset::MsGothic => "MS Gothic",
+        FontPreset::Auto => "自動 (日本語優先)",
+        FontPreset::YuGothic => "游ゴシック",
+        FontPreset::Meiryo => "メイリオ",
+        FontPreset::YuMincho => "游明朝",
+        FontPreset::MsGothic => "ＭＳ ゴシック",
         FontPreset::NotoSansCjk => "Noto Sans CJK",
-        FontPreset::Default => "egui default (no CJK)",
-        FontPreset::Custom => "Custom file...",
+        FontPreset::Default => "egui 標準 (日本語なし)",
+        FontPreset::Custom => "カスタムファイル…",
     }
 }
 
