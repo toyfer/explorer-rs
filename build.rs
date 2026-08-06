@@ -13,7 +13,7 @@ fn main() {
             res.set_icon("assets/icon.ico");
             res.set_language(0x0411);
             if let Err(e) = res.compile() {
-                eprintln("cargo:warning=winresource: {e} (continuing without icon)");
+                eprintln!("cargo:warning=winresource: {e} (continuing without icon)");
             }
         } else {
             println!("cargo:warning=skipping icon embed (no valid assets/icon.ico)");
