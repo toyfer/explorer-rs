@@ -1,4 +1,4 @@
-use std::collections::BTreeSet;
+use std::collections::{BTreeSet, HashMap};
 use std::path::{Path, PathBuf};
 use std::time::Instant;
 
@@ -35,10 +35,8 @@ pub struct ExplorerApp {
     pub last_error: Option<String>,
     pub confirm_delete: Option<ConfirmDelete>,
     pub font_path_edit: String,
-    // incremental search (type to jump)
     typeahead: String,
     typeahead_at: Option<Instant>,
-    // watcher / async listing (stability & perf)
     watcher: Option<watch::WatchedDir>,
     watcher2: Option<watch::WatchedDir>,
     list_gen: u64,
@@ -47,6 +45,7 @@ pub struct ExplorerApp {
     listing_p2: bool,
     bg_tx: BgSender,
     bg_rx: BgReceiver,
+    icon_cache: HashMap<String, egui::TextureHandle>,
 }
 
 #[derive(Clone)]
@@ -98,6 +97,7 @@ impl ExplorerApp {
             listing_p2: false,
             bg_tx,
             bg_rx,
+            icon_cache: HashMap::new(),
         };
         app.sync_watchers();
         app.update_preview();
@@ -220,60 +220,122 @@ impl ExplorerApp {
             self.sync_watchers();
             self.update_preview();
         } else {
-            // OS standard open (ShellExecute / open::that)
             match shell::open_with_shell(path) { Ok(_) => self.status = format!("開きました: {}", path.display()), Err(e) => self.status = format!("開けませんでした: {e}"), }
         }
     }
     fn clear_typeahead(&mut self) { self.typeahead.clear(); self.typeahead_at = None; }
+    fn icon_cache_key(path: &Path, is_dir: bool) -> String {
+        if is_dir { return "__dir__".to_string(); }
+        let ext = path.extension().and_then(|s| s.to_str()).unwrap_or("").to_lowercase();
+        if ext == "exe" || ext == "ico" || ext == "lnk" {
+            return format!("file:{}", path.display());
+        }
+        format!("ext:{ext}")
+    }
+    fn get_or_load_icon(&mut self, ctx: &egui::Context, path: &Path, is_dir: bool) -> Option<egui::TextureHandle> {
+        let key = Self::icon_cache_key(path, is_dir);
+        if let Some(h) = self.icon_cache.get(&key) { return Some(h.clone()); }
+        #[cfg(windows)]
+        {
+            if let Some((rgba, w, h)) = shell::icon_rgba(path, is_dir) {
+                if w > 0 && h > 0 && rgba.len() == (w*h*4) as usize {
+                    let img = egui::ColorImage::from_rgba_unmultiplied([w as usize, h as usize], &rgba);
+                    let tex = ctx.load_texture(key.clone(), img, egui::TextureOptions::LINEAR);
+                    self.icon_cache.insert(key.clone(), tex.clone());
+                    return Some(tex);
+                }
+            }
+        }
+        None
+    }
     fn handle_typeahead(&mut self, ctx: &egui::Context) {
-        // Don't steal input when a text field is focused or a dialog is open
         if ctx.wants_keyboard_input() { return; }
         if self.renaming || self.show_new_folder_dialog || self.confirm_delete.is_some() { return; }
-        // Collect typed text from egui events (already filtered for printable)
-        let mut typed = String::new();
+        let mut backspace_pressed = false;
         ctx.input(|i| {
             for ev in &i.events {
-                if let egui::Event::Text(t) = ev {
-                    // egui already filters Ctrl/Cmd, so Text here is user typing
-                    if !t.is_empty() && t.chars().all(|c| !c.is_control()) {
-                        typed.push_str(t);
+                if let egui::Event::Key { key: egui::Key::Backspace, pressed: true, modifiers, .. } = ev {
+                    if !modifiers.ctrl && !modifiers.command && !modifiers.alt {
+                        backspace_pressed = true;
                     }
                 }
             }
         });
-        if typed.is_empty() {
-            // expire after 1.5s
+        if backspace_pressed && !self.typeahead.is_empty() {
+            self.typeahead.pop();
+            self.typeahead_at = Some(Instant::now());
+            if self.typeahead.is_empty() {
+                self.status = "検索クリア".into();
+                ctx.request_repaint();
+                return;
+            }
+        } else if backspace_pressed {
+            return;
+        }
+        let mut typed = String::new();
+        let mut has_text = false;
+        ctx.input(|i| {
+            for ev in &i.events {
+                if let egui::Event::Text(t) = ev {
+                    if !t.is_empty() && t.chars().all(|c| !c.is_control()) {
+                        typed.push_str(t);
+                        has_text = true;
+                    }
+                }
+            }
+            if !has_text {
+                for ev in &i.events {
+                    if let egui::Event::Key { key, pressed: true, modifiers, .. } = ev {
+                        if modifiers.ctrl || modifiers.command || modifiers.alt { continue; }
+                        // Allow romaji input even when IME is on: map physical keys to chars when Text is empty
+                        let ch = match key {
+                            egui::Key::A => 'a', egui::Key::B => 'b', egui::Key::C => 'c', egui::Key::D => 'd',
+                            egui::Key::E => 'e', egui::Key::F => 'f', egui::Key::G => 'g', egui::Key::H => 'h',
+                            egui::Key::I => 'i', egui::Key::J => 'j', egui::Key::K => 'k', egui::Key::L => 'l',
+                            egui::Key::M => 'm', egui::Key::N => 'n', egui::Key::O => 'o', egui::Key::P => 'p',
+                            egui::Key::Q => 'q', egui::Key::R => 'r', egui::Key::S => 's', egui::Key::T => 't',
+                            egui::Key::U => 'u', egui::Key::V => 'v', egui::Key::W => 'w', egui::Key::X => 'x',
+                            egui::Key::Y => 'y', egui::Key::Z => 'z',
+                            egui::Key::Num0 => '0', egui::Key::Num1 => '1', egui::Key::Num2 => '2', egui::Key::Num3 => '3',
+                            egui::Key::Num4 => '4', egui::Key::Num5 => '5', egui::Key::Num6 => '6', egui::Key::Num7 => '7',
+                            egui::Key::Num8 => '8', egui::Key::Num9 => '9',
+                            egui::Key::Minus => '-', egui::Key::Period => '.', egui::Key::Slash => '/',
+                            egui::Key::Backslash => '\\', egui::Key::Comma => ',',
+                            _ => continue,
+                        };
+                        typed.push(ch);
+                        has_text = true;
+                    }
+                }
+            }
+        });
+        if typed.is_empty() && !backspace_pressed {
             if let Some(at) = self.typeahead_at {
                 if at.elapsed().as_millis() > 1500 {
                     self.clear_typeahead();
                 } else {
-                    // keep showing hint
                     ctx.request_repaint_after(std::time::Duration::from_millis(100));
                 }
             }
             return;
         }
-        // Reset if expired
-        if let Some(at) = self.typeahead_at {
-            if at.elapsed().as_millis() > 1500 {
-                self.typeahead.clear();
+        if !typed.is_empty() {
+            if let Some(at) = self.typeahead_at {
+                if at.elapsed().as_millis() > 1500 { self.typeahead.clear(); }
             }
+            self.typeahead.push_str(&typed);
+            self.typeahead_at = Some(Instant::now());
+        } else {
+            self.typeahead_at = Some(Instant::now());
         }
-        self.typeahead.push_str(&typed);
-        self.typeahead_at = Some(Instant::now());
         let q = self.typeahead.to_lowercase();
         let entries = self.current_tab().entries.clone();
-        // Find next match after current focus, wrapping around
         let start = self.current_tab().focus.map(|f| f + 1).unwrap_or(0);
         let mut found: Option<usize> = None;
         for offset in 0..entries.len() {
             let idx = (start + offset) % entries.len();
-            if entries[idx].name.to_lowercase().starts_with(&q) {
-                found = Some(idx);
-                break;
-            }
+            if entries[idx].name.to_lowercase().starts_with(&q) { found = Some(idx); break; }
         }
-        // Fallback: contains
         if found.is_none() {
             for (idx, e) in entries.iter().enumerate() {
                 if e.name.to_lowercase().contains(&q) { found = Some(idx); break; }
@@ -308,8 +370,8 @@ impl ExplorerApp {
             let cur = self.current_tab().current.clone();
             let free = fs_ops::free_space(&cur).unwrap_or_default();
             let n = self.current_tab().entries.len();
-            let tip = if self.typeahead.is_empty() { "文字を入力でインクリメント検索" } else { &format!("検索中: '{}'", self.typeahead) };
-            self.preview_text = format!("場所: {cur}\n\n項目数: {n}\n{free}\n\nヒント:\n• {tip} (1.5秒でリセット)\n• Ctrl+クリックで複数選択 / Shift+範囲\n• Ctrl+A 全選択\n• F2 名前変更\n• Del=ごみ箱 / Shift+Del=完全削除（確認あり）\n• Ctrl+C/X/V コピー/切り取り/貼り付け\n• Ctrl+T 新規タブ / Ctrl+W 閉じる\n• 左サイド「表示」でフォント変更 (BIZ UDゴシック標準)\n• アドレスは \\ と / どちらでも可", cur=cur.display(), tip=tip);
+            let tip = if self.typeahead.is_empty() { "文字を入力でインクリメント検索".to_string() } else { format!("検索中: '{}'", self.typeahead) };
+            self.preview_text = format!("場所: {cur}\n\n項目数: {n}\n{free}\n\nヒント:\n• {tip} (1.5秒でリセット)\n• Backspaceで1文字削除\n• Ctrl+クリックで複数選択 / Shift+範囲\n• Ctrl+A 全選択\n• F2 名前変更\n• Del=ごみ箱 / Shift+Del=完全削除（確認あり）\n• Ctrl+C/X/V コピー/切り取り/貼り付け\n• Ctrl+T 新規タブ / Ctrl+W 閉じる\n• 左サイド「表示」でフォント変更 (BIZ UDゴシック標準)\n• アドレスは \\ と / どちらでも可", cur=cur.display(), tip=tip);
         }
     }
     fn run_command(&mut self, cmd: Command) {
@@ -435,7 +497,6 @@ impl ExplorerApp {
         if ctx.input_mut(|i| i.consume_key(egui::Modifiers::NONE, egui::Key::Delete)) { let shift = ctx.input(|i| i.modifiers.shift); self.run_command(Command::Delete { permanent: shift }); }
         if ctx.input_mut(|i| i.consume_key(egui::Modifiers::NONE, egui::Key::Enter)) { self.run_command(Command::OpenPrimary); }
         if ctx.input_mut(|i| i.consume_key(egui::Modifiers::NONE, egui::Key::Escape)) { if !self.typeahead.is_empty() { self.clear_typeahead(); self.status = "検索クリア".into(); } else { self.current_tab_mut().clear_selection(); self.search_results.clear(); self.search_query.clear(); self.update_preview(); } }
-        // Arrow keys with typeahead awareness
         if ctx.input_mut(|i| i.consume_key(egui::Modifiers::NONE, egui::Key::ArrowDown)) {
             let len = self.current_tab().entries.len();
             if len > 0 {
@@ -518,7 +579,6 @@ impl eframe::App for ExplorerApp {
                 commands::spawn_paste(self.bg_tx.clone(), paths, ClipboardMode::Copy, dest_dir);
             }
         }
-        // Incremental search has priority over other shortcuts
         self.handle_typeahead(ctx);
         self.handle_shortcuts(ctx);
         if let Some(conf)=self.confirm_delete.clone() {
@@ -550,12 +610,35 @@ impl eframe::App for ExplorerApp {
                 if ui.button("＋ タブ").on_hover_text("Ctrl+T").clicked() { let cur=self.current_tab().current.clone(); let sh=self.show_hidden; let sb=self.current_tab().sort_by; let sd=self.current_tab().sort_desc; self.tabs.push(Tab::new(cur, sh, sb, sd)); self.active=self.tabs.len()-1; self.active_pane=0; self.sync_address(); self.sync_watchers(); }
                 ui.separator();
                 ui.label("アドレス:");
-                let resp=ui.add(egui::TextEdit::singleline(&mut self.address).desired_width(420.0).hint_text("パスを入力… ( \\ と / どちらでも可 )"));
-                if (resp.lost_focus() && ui.input(|i| i.key_pressed(egui::Key::Enter))) || ui.small_button("移動").clicked() { let p=shell::normalize_path_input(self.address.trim()); if p.as_os_str().is_empty() { self.status = "パスを入力してください".into(); } else if p.exists() { self.clear_typeahead(); self.current_tab_mut().navigate_to(p); self.sync_address(); self.sync_watchers(); self.update_preview(); } else { self.status=format!("見つかりません: {}", self.address); } }
+                let resp = ui.add(egui::TextEdit::singleline(&mut self.address).desired_width(420.0).hint_text("パスを入力… ( \\ と / どちらでも可 )"));
+                let enter_pressed = ui.input(|i| i.key_pressed(egui::Key::Enter));
+                let should_navigate = (resp.has_focus() && enter_pressed) || (resp.lost_focus() && enter_pressed) || ui.small_button("移動").clicked();
+                if should_navigate {
+                    let p = shell::normalize_path_input(self.address.trim());
+                    if p.as_os_str().is_empty() {
+                        self.status = "パスを入力してください".into();
+                    } else if p.exists() {
+                        if p.is_dir() {
+                            self.clear_typeahead();
+                            self.current_tab_mut().navigate_to(p);
+                            self.sync_address();
+                            self.sync_watchers();
+                            self.update_preview();
+                        } else {
+                            match shell::open_with_shell(&p) {
+                                Ok(_) => self.status = format!("開きました: {}", p.display()),
+                                Err(e) => self.status = format!("開けませんでした: {e}"),
+                            }
+                        }
+                    } else {
+                        self.status = format!("見つかりません: {}", self.address);
+                    }
+                }
                 ui.separator();
                 ui.label("🔍");
                 let sresp=ui.add(egui::TextEdit::singleline(&mut self.search_query).desired_width(160.0).hint_text("検索"));
-                if (sresp.lost_focus() && ui.input(|i| i.key_pressed(egui::Key::Enter))) || ui.small_button("検索").clicked() { self.run_command(Command::Search); }
+                let search_enter = sresp.has_focus() && ui.input(|i| i.key_pressed(egui::Key::Enter));
+                if (sresp.lost_focus() && ui.input(|i| i.key_pressed(egui::Key::Enter))) || search_enter || ui.small_button("検索").clicked() { self.run_command(Command::Search); }
                 if !self.search_query.is_empty() && ui.small_button("クリア").clicked() { self.search_query.clear(); self.search_results.clear(); }
                 ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                     let mut dual=self.dual_pane; if ui.checkbox(&mut dual, "2ペイン").changed() { self.set_dual_pane(dual); }
@@ -684,7 +767,7 @@ impl ExplorerApp {
         let row_h=22.0; let num_rows=entries.len().max(1);
         egui_extras::TableBuilder::new(ui).striped(true).resizable(true).cell_layout(egui::Layout::left_to_right(egui::Align::Center)).column(egui_extras::Column::auto().at_least(280.0).resizable(true)).column(egui_extras::Column::auto().at_least(90.0)).column(egui_extras::Column::auto().at_least(140.0)).column(egui_extras::Column::remainder().at_least(70.0)).auto_shrink([false,false]).vscroll(true).header(24.0, |mut header| { header.col(|ui| { let label=header_label("名前", sort_by==SortBy::Name, sort_desc); if ui.selectable_label(false,label).clicked() { sort_clicked=Some(SortBy::Name); } }); header.col(|ui| { let label=header_label("サイズ", sort_by==SortBy::Size, sort_desc); if ui.selectable_label(false,label).clicked() { sort_clicked=Some(SortBy::Size); } }); header.col(|ui| { let label=header_label("更新日時", sort_by==SortBy::Modified, sort_desc); if ui.selectable_label(false,label).clicked() { sort_clicked=Some(SortBy::Modified); } }); header.col(|ui| { let label=header_label("種類", sort_by==SortBy::Type, sort_desc); if ui.selectable_label(false,label).clicked() { sort_clicked=Some(SortBy::Type); } }); }).body(|body| {
             if entries.is_empty() { body.rows(row_h, 1, |mut row| { row.col(|ui| { ui.label("（空のフォルダ）"); }); row.col(|ui| { ui.label("-"); }); row.col(|ui| { ui.label("-"); }); row.col(|ui| { ui.label("-"); }); }); return; }
-            body.rows(row_h, num_rows, |mut row| { let idx=row.index(); let Some(entry)=entries.get(idx) else { return; }; let is_sel=selected.contains(&idx); row.col(|ui| { let ctrl=ui.input(|i| i.modifiers.command || i.modifiers.ctrl); let shift=ui.input(|i| i.modifiers.shift); let icon=shell::icon_emoji_for_path(&entry.path, entry.is_dir); let label=format!("{icon} {}", entry.name); let resp=ui.selectable_label(is_sel, label); if resp.clicked() { if ctrl { select_action=Some(SelectAction::Toggle(idx)); } else if shift { select_action=Some(SelectAction::Range(idx)); } else { select_action=Some(SelectAction::Only(idx)); } } if resp.double_clicked() { select_action=Some(SelectAction::Only(idx)); if entry.is_dir { open_path=Some(entry.path.clone()); } else { let _=shell::open_with_shell(&entry.path); } } if resp.secondary_clicked() && !selected.contains(&idx) { select_action=Some(SelectAction::Only(idx)); } resp.context_menu(|ui| { if ui.button("開く").clicked() { if entry.is_dir { open_path=Some(entry.path.clone()); } else { let _=shell::open_with_shell(&entry.path); } ui.close_menu(); } if ui.button("Explorerで表示").clicked() { let _ = shell::reveal_in_explorer(&entry.path); ui.close_menu(); } if ui.button("パスをコピー").clicked() { ui.output_mut(|o| o.copied_text=entry.path.display().to_string()); ui.close_menu(); } ui.separator(); if ui.button("コピー (Ctrl+C)").clicked() { cmd=Some(Command::Copy); ui.close_menu(); } if ui.button("切り取り (Ctrl+X)").clicked() { cmd=Some(Command::Cut); ui.close_menu(); } if ui.button("貼り付け (Ctrl+V)").clicked() { cmd=Some(Command::Paste); ui.close_menu(); } ui.separator(); if ui.button("名前変更 (F2)").clicked() { cmd=Some(Command::Rename); ui.close_menu(); } if ui.button("ごみ箱へ (Del)").clicked() { cmd=Some(Command::Delete { permanent: false }); ui.close_menu(); } if ui.button("完全削除 (Shift+Del)").clicked() { cmd=Some(Command::Delete { permanent: true }); ui.close_menu(); } ui.separator(); if ui.button("新しいフォルダ").clicked() { cmd=Some(Command::NewFolder); ui.close_menu(); } if ui.button("全選択 (Ctrl+A)").clicked() { cmd=Some(Command::SelectAll); ui.close_menu(); } }); }); row.col(|ui| { ui.label(if entry.is_dir {"-".into()} else {fs_ops::humansize(entry.size)}); }); row.col(|ui| { ui.label(fs_ops::fmt_time(entry.modified)); }); row.col(|ui| { if let Some(t) = shell::os_type_name(&entry.path) { ui.label(t); } else { ui.label(&entry.ext); } }); });
+            body.rows(row_h, num_rows, |mut row| { let idx=row.index(); let Some(entry)=entries.get(idx) else { return; }; let is_sel=selected.contains(&idx); row.col(|ui| { let ctrl=ui.input(|i| i.modifiers.command || i.modifiers.ctrl); let shift=ui.input(|i| i.modifiers.shift); let tex = self.get_or_load_icon(ui.ctx(), &entry.path, entry.is_dir); ui.horizontal(|ui| { if let Some(t) = tex { ui.image(egui::ImageSource::Texture(egui::load::SizedTexture::new(t.id(), egui::vec2(16.0,16.0)))); } else { ui.label(shell::icon_emoji_for_path(&entry.path, entry.is_dir)); } let label = entry.name.clone(); let resp = ui.selectable_label(is_sel, label); if resp.clicked() { if ctrl { select_action=Some(SelectAction::Toggle(idx)); } else if shift { select_action=Some(SelectAction::Range(idx)); } else { select_action=Some(SelectAction::Only(idx)); } } if resp.double_clicked() { select_action=Some(SelectAction::Only(idx)); if entry.is_dir { open_path=Some(entry.path.clone()); } else { let _=shell::open_with_shell(&entry.path); } } if resp.secondary_clicked() && !selected.contains(&idx) { select_action=Some(SelectAction::Only(idx)); } resp.context_menu(|ui| { if ui.button("開く").clicked() { if entry.is_dir { open_path=Some(entry.path.clone()); } else { let _=shell::open_with_shell(&entry.path); } ui.close_menu(); } if ui.button("Explorerで表示").clicked() { let _ = shell::reveal_in_explorer(&entry.path); ui.close_menu(); } if ui.button("パスをコピー").clicked() { ui.output_mut(|o| o.copied_text=entry.path.display().to_string()); ui.close_menu(); } ui.separator(); if ui.button("コピー (Ctrl+C)").clicked() { cmd=Some(Command::Copy); ui.close_menu(); } if ui.button("切り取り (Ctrl+X)").clicked() { cmd=Some(Command::Cut); ui.close_menu(); } if ui.button("貼り付け (Ctrl+V)").clicked() { cmd=Some(Command::Paste); ui.close_menu(); } ui.separator(); if ui.button("名前変更 (F2)").clicked() { cmd=Some(Command::Rename); ui.close_menu(); } if ui.button("ごみ箱へ (Del)").clicked() { cmd=Some(Command::Delete { permanent: false }); ui.close_menu(); } if ui.button("完全削除 (Shift+Del)").clicked() { cmd=Some(Command::Delete { permanent: true }); ui.close_menu(); } ui.separator(); if ui.button("新しいフォルダ").clicked() { cmd=Some(Command::NewFolder); ui.close_menu(); } if ui.button("全選択 (Ctrl+A)").clicked() { cmd=Some(Command::SelectAll); ui.close_menu(); } }); }); }); row.col(|ui| { ui.label(if entry.is_dir {"-".into()} else {fs_ops::humansize(entry.size)}); }); row.col(|ui| { ui.label(fs_ops::fmt_time(entry.modified)); }); row.col(|ui| { if let Some(t) = shell::os_type_name(&entry.path) { ui.label(t); } else { ui.label(&entry.ext); } }); });
         });
         if let Some(s)=sort_clicked { let t=self.tab_for_mut(pane); if t.sort_by==s { t.sort_desc=!t.sort_desc; } else { t.sort_by=s; t.sort_desc=false; } t.sort(); }
         if let Some(a)=select_action { self.active_pane=match pane { PaneId::Tab=>0, PaneId::Pane2=>1, }; let t=self.tab_for_mut(pane); match a { SelectAction::Only(i)=>t.select_only(i), SelectAction::Toggle(i)=>t.toggle_select(i), SelectAction::Range(i)=>t.select_range_to(i), } self.sync_address(); self.update_preview(); }
