@@ -1,0 +1,32 @@
+   Compiling explorer-rs v0.1.1 (D:\a\explorer-rs\explorer-rs)
+warning: explorer-rs@0.1.1: skipping icon embed (no valid assets/icon.ico)
+error[E0004]: non-exhaustive patterns: `commands::BgEvent::FsChanged` and `commands::BgEvent::ListDone { .. }` not covered
+   --> src\app.rs:152:19
+    |
+152 |             match ev {
+    |                   ^^ patterns `commands::BgEvent::FsChanged` and `commands::BgEvent::ListDone { .. }` not covered
+    |
+note: `commands::BgEvent` defined here
+   --> src\commands.rs:32:10
+    |
+ 32 | pub enum BgEvent {
+    |          ^^^^^^^
+...
+ 36 |     FsChanged,
+    |     --------- not covered
+ 37 |     /// Async directory listing finished.
+ 38 |     ListDone { generation: u64, entries: Vec<FileEntry>, error: Option<String> },
+    |     -------- not covered
+    = note: the matched value is of type `commands::BgEvent`
+help: ensure that all possible cases are being handled by adding a match arm with a wildcard pattern, a match arm with multiple or-patterns as shown, or multiple match arms
+    |
+172 ~                 },
+173 +                 commands::BgEvent::FsChanged | commands::BgEvent::ListDone { .. } => todo!()
+    |
+
+For more information about this error, try `rustc --explain E0004`.
+warning: explorer-rs@0.1.1: skipping icon embed (no valid assets/icon.ico)
+error: could not compile `explorer-rs` (bin "explorer-rs") due to 1 previous error
+warning: build failed, waiting for other jobs to finish...
+warning: explorer-rs@0.1.1: skipping icon embed (no valid assets/icon.ico)
+error: could not compile `explorer-rs` (bin "explorer-rs" test) due to 1 previous error
