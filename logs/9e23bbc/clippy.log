@@ -1,0 +1,67 @@
+   Compiling explorer-rs v0.1.1 (D:\a\explorer-rs\explorer-rs)
+warning: explorer-rs@0.1.1: skipping icon embed (no valid assets/icon.ico)
+error[E0599]: no associated function or constant named `list_blocking` found for struct `tab::Tab` in the current scope
+  --> src\commands.rs:93:53
+   |
+93 |         let (mut entries, error) = crate::tab::Tab::list_blocking(&dir, show_hidden, &filter);
+   |                                                     ^^^^^^^^^^^^^ associated function or constant not found in `tab::Tab`
+   |
+  ::: src\tab.rs:68:1
+   |
+68 | pub struct Tab {
+   | -------------- associated function or constant `list_blocking` not found for this struct
+   |
+note: if you're trying to build a new `tab::Tab`, consider using `tab::Tab::new` which returns `tab::Tab`
+  --> src\tab.rs:86:5
+   |
+86 |     pub fn new(path: PathBuf, show_hidden: bool, sort_by: SortBy, sort_desc: bool) -> Self {
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error[E0599]: no associated function or constant named `sort_entries` found for struct `tab::Tab` in the current scope
+  --> src\commands.rs:95:26
+   |
+95 |         crate::tab::Tab::sort_entries(&mut entries, sort_by, sort_desc);
+   |                          ^^^^^^^^^^^^ associated function or constant not found in `tab::Tab`
+   |
+  ::: src\tab.rs:68:1
+   |
+68 | pub struct Tab {
+   | -------------- associated function or constant `sort_entries` not found for this struct
+   |
+note: if you're trying to build a new `tab::Tab`, consider using `tab::Tab::new` which returns `tab::Tab`
+  --> src\tab.rs:86:5
+   |
+86 |     pub fn new(path: PathBuf, show_hidden: bool, sort_by: SortBy, sort_desc: bool) -> Self {
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error[E0004]: non-exhaustive patterns: `commands::BgEvent::FsChanged` and `commands::BgEvent::ListDone { .. }` not covered
+   --> src\app.rs:152:19
+    |
+152 |             match ev {
+    |                   ^^ patterns `commands::BgEvent::FsChanged` and `commands::BgEvent::ListDone { .. }` not covered
+    |
+note: `commands::BgEvent` defined here
+   --> src\commands.rs:32:10
+    |
+ 32 | pub enum BgEvent {
+    |          ^^^^^^^
+...
+ 36 |     FsChanged,
+    |     --------- not covered
+ 37 |     /// Async directory listing finished.
+ 38 |     ListDone { generation: u64, entries: Vec<FileEntry>, error: Option<String> },
+    |     -------- not covered
+    = note: the matched value is of type `commands::BgEvent`
+help: ensure that all possible cases are being handled by adding a match arm with a wildcard pattern, a match arm with multiple or-patterns as shown, or multiple match arms
+    |
+172 ~                 },
+173 +                 commands::BgEvent::FsChanged | commands::BgEvent::ListDone { .. } => todo!()
+    |
+
+Some errors have detailed explanations: E0004, E0599.
+For more information about an error, try `rustc --explain E0004`.
+warning: explorer-rs@0.1.1: skipping icon embed (no valid assets/icon.ico)
+error: could not compile `explorer-rs` (bin "explorer-rs") due to 3 previous errors
+warning: build failed, waiting for other jobs to finish...
+warning: explorer-rs@0.1.1: skipping icon embed (no valid assets/icon.ico)
+error: could not compile `explorer-rs` (bin "explorer-rs" test) due to 3 previous errors
