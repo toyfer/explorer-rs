@@ -4,16 +4,16 @@ use std::path::{Path, PathBuf};
 use eframe::egui;
 
 use crate::commands::{self, BgEvent, BgReceiver, BgSender, Command};
-use crate::config::{AppConfig, Bookmark, SortBy};
+use crate::config::{AppConfig, Bookmark, FontPreset, SortBy};
+use crate::fonts;
 use crate::fs_ops::{self, Clipboard, ClipboardMode};
 use crate::tab::{FileEntry, Tab};
 
 pub struct ExplorerApp {
     pub tabs: Vec<Tab>,
     pub active: usize,
-    /// Independent second pane when dual_pane is on (not a tab).
     pub pane2: Option<Tab>,
-    pub active_pane: u8, // 0 = tabs[active], 1 = pane2
+    pub active_pane: u8,
     pub address: String,
     pub search_query: String,
     pub search_results: Vec<FileEntry>,
@@ -31,6 +31,8 @@ pub struct ExplorerApp {
     pub show_new_folder_dialog: bool,
     pub last_error: Option<String>,
     pub confirm_delete: Option<ConfirmDelete>,
+    /// Editable custom font path (synced to config on apply).
+    pub font_path_edit: String,
     bg_tx: BgSender,
     bg_rx: BgReceiver,
 }
@@ -47,6 +49,7 @@ impl ExplorerApp {
         let dual_pane = config.dual_pane;
         let sort_by = config.sort_by;
         let sort_desc = config.sort_desc;
+        let font_path_edit = config.font_custom_path.clone().unwrap_or_default();
         let tab = Tab::new(start_path.clone(), show_hidden, sort_by, sort_desc);
         let pane2 = if dual_pane {
             Some(Tab::new(start_path.clone(), show_hidden, sort_by, sort_desc))
@@ -64,7 +67,7 @@ impl ExplorerApp {
             search_results: vec![],
             searching: false,
             pasting: false,
-            status: "準備完了 — F2名前変更 / Delごみ箱 / Shift+Del完全削除 / Ctrl+A全選択".into(),
+            status: "準備完了".into(),
             config,
             clipboard: None,
             show_hidden,
@@ -76,6 +79,7 @@ impl ExplorerApp {
             show_new_folder_dialog: false,
             last_error: None,
             confirm_delete: None,
+            font_path_edit,
             bg_tx,
             bg_rx,
         };
@@ -115,6 +119,28 @@ impl ExplorerApp {
         self.config.sort_by = sort_by;
         self.config.sort_desc = sort_desc;
         self.config.last_path = Some(last_path);
+        let path = self.font_path_edit.trim();
+        self.config.font_custom_path = if path.is_empty() {
+            None
+        } else {
+            Some(path.to_string())
+        };
+    }
+
+    fn apply_font_settings(&mut self, ctx: &egui::Context) {
+        let path = self.font_path_edit.trim();
+        self.config.font_custom_path = if path.is_empty() {
+            None
+        } else {
+            Some(path.to_string())
+        };
+        if self.config.font_preset == FontPreset::Custom && path.is_empty() {
+            self.status = "カスタムフォントのパスを指定してください".into();
+            return;
+        }
+        let msg = fonts::apply_fonts(ctx, &self.config);
+        self.status = format!("適用しました — {msg}");
+        let _ = self.config.save();
     }
 
     fn poll_bg(&mut self, ctx: &egui::Context) {
@@ -211,7 +237,7 @@ impl ExplorerApp {
             let free = fs_ops::free_space(&cur).unwrap_or_default();
             let n = self.current_tab().entries.len();
             self.preview_text = format!(
-                "場所: {cur}\n\n項目数: {n}\n{free}\n\nヒント:\n• Ctrl+クリックで複数選択 / Shift+範囲\n• Ctrl+A 全選択\n• F2 名前変更\n• Del=ごみ箱 / Shift+Del=完全削除（確認あり）\n• Ctrl+C/X/V コピー/切り取り/貼り付け\n• Ctrl+T 新規タブ / Ctrl+W 閉じる",
+                "場所: {cur}\n\n項目数: {n}\n{free}\n\nヒント:\n• Ctrl+クリックで複数選択 / Shift+範囲\n• Ctrl+A 全選択\n• F2 名前変更\n• Del=ごみ箱 / Shift+Del=完全削除（確認あり）\n• Ctrl+C/X/V コピー/切り取り/貼り付け\n• Ctrl+T 新規タブ / Ctrl+W 閉じる\n• 左サイド「表示」で日本語フォントを変更",
                 cur = cur.display()
             );
         }
@@ -561,6 +587,90 @@ impl ExplorerApp {
             self.active_pane = 0;
         }
     }
+
+    /// Font / theme section in the left sidebar.
+    fn ui_display_settings(&mut self, ui: &mut egui::Ui, ctx: &egui::Context) {
+        ui.collapsing("表示", |ui| {
+            ui.checkbox(&mut self.config.show_preview, "プレビュー");
+            let mut dark = self.config.theme_dark;
+            if ui.checkbox(&mut dark, "ダークテーマ").changed() {
+                self.config.theme_dark = dark;
+                if dark {
+                    ctx.set_visuals(egui::Visuals::dark());
+                } else {
+                    ctx.set_visuals(egui::Visuals::light());
+                }
+            }
+
+            ui.separator();
+            ui.strong("フォント（日本語）");
+            ui.label("ファイル名や UI の日本語表示に使います。");
+
+            egui::ComboBox::from_id_salt("font_preset")
+                .selected_text(fonts::preset_label(self.config.font_preset))
+                .width(200.0)
+                .show_ui(ui, |ui| {
+                    for p in fonts::all_presets() {
+                        ui.selectable_value(
+                            &mut self.config.font_preset,
+                            *p,
+                            fonts::preset_label(*p),
+                        );
+                    }
+                });
+
+            ui.horizontal(|ui| {
+                ui.label("サイズ");
+                let mut size = self.config.font_size;
+                if ui
+                    .add(egui::Slider::new(&mut size, 10.0..=24.0).suffix(" pt"))
+                    .changed()
+                {
+                    self.config.font_size = size;
+                    fonts::apply_text_styles(ctx, size);
+                }
+            });
+
+            if self.config.font_preset == FontPreset::Custom
+                || !self.font_path_edit.trim().is_empty()
+            {
+                ui.label("カスタムフォント (.ttf / .otf / .ttc)");
+                ui.horizontal(|ui| {
+                    ui.add(
+                        egui::TextEdit::singleline(&mut self.font_path_edit)
+                            .desired_width(160.0)
+                            .hint_text("C:\\Windows\\Fonts\\..."),
+                    );
+                    if ui.small_button("参照…").clicked() {
+                        if let Some(path) = rfd::FileDialog::new()
+                            .add_filter("フォント", &["ttf", "otf", "ttc", "TTF", "OTF", "TTC"])
+                            .set_title("日本語フォントを選択")
+                            .pick_file()
+                        {
+                            self.font_path_edit = path.display().to_string();
+                            self.config.font_preset = FontPreset::Custom;
+                        }
+                    }
+                });
+            }
+
+            ui.horizontal(|ui| {
+                if ui.button("フォントを適用").clicked() {
+                    self.apply_font_settings(ctx);
+                }
+                if ui.button("設定を保存").clicked() {
+                    self.sync_config_from_state();
+                    match self.config.save() {
+                        Ok(()) => self.status = "設定を保存しました".into(),
+                        Err(e) => self.status = e,
+                    }
+                }
+            });
+
+            ui.small("Windows: 游ゴシック / メイリオ 等を自動検出");
+            ui.small("Linux: Noto Sans CJK が必要 (fonts-noto-cjk)");
+        });
+    }
 }
 
 impl eframe::App for ExplorerApp {
@@ -574,7 +684,6 @@ impl eframe::App for ExplorerApp {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         self.poll_bg(ctx);
 
-        // Drag & drop hover preview (official egui pattern)
         if ctx.input(|i| !i.raw.hovered_files.is_empty()) {
             let text = ctx.input(|i| {
                 let mut text = "ドロップでコピー:\n".to_owned();
@@ -602,7 +711,6 @@ impl eframe::App for ExplorerApp {
             );
         }
 
-        // Drag & drop
         let dropped = ctx.input(|i| i.raw.dropped_files.clone());
         if !dropped.is_empty() {
             let dest_dir = self.current_tab().current.clone();
@@ -626,7 +734,6 @@ impl eframe::App for ExplorerApp {
 
         self.handle_shortcuts(ctx);
 
-        // Confirm delete modal
         if let Some(conf) = self.confirm_delete.clone() {
             let permanent = conf.permanent;
             let n = conf.paths.len();
@@ -684,7 +791,6 @@ impl eframe::App for ExplorerApp {
             }
         }
 
-        // Top bar
         egui::TopBottomPanel::top("top_bar").show(ctx, |ui| {
             ui.horizontal_wrapped(|ui| {
                 let back_ok = !self.current_tab().history_back.is_empty();
@@ -772,7 +878,6 @@ impl eframe::App for ExplorerApp {
                 });
             });
 
-            // Tab bar
             let mut switch_to: Option<usize> = None;
             let mut close_idx: Option<usize> = None;
             let mut tab_action: Option<(usize, &'static str)> = None;
@@ -789,10 +894,7 @@ impl eframe::App for ExplorerApp {
                     if resp.clicked() {
                         switch_to = Some(i);
                     }
-                    if ui
-                        .small_button("×")
-                        .on_hover_text("Ctrl+W")
-                        .clicked()
+                    if ui.small_button("×").on_hover_text("Ctrl+W").clicked()
                         && self.tabs.len() > 1
                     {
                         close_idx = Some(i);
@@ -828,22 +930,14 @@ impl eframe::App for ExplorerApp {
                 match act {
                     "dup" => {
                         let t = &self.tabs[i];
-                        let nt = Tab::new(
-                            t.current.clone(),
-                            t.show_hidden,
-                            t.sort_by,
-                            t.sort_desc,
-                        );
+                        let nt =
+                            Tab::new(t.current.clone(), t.show_hidden, t.sort_by, t.sort_desc);
                         self.tabs.push(nt);
                     }
                     "close_others" => {
                         let t = self.tabs[i].clone();
-                        self.tabs = vec![Tab::new(
-                            t.current,
-                            t.show_hidden,
-                            t.sort_by,
-                            t.sort_desc,
-                        )];
+                        self.tabs =
+                            vec![Tab::new(t.current, t.show_hidden, t.sort_by, t.sort_desc)];
                         self.active = 0;
                         self.active_pane = 0;
                         self.sync_address();
@@ -854,7 +948,6 @@ impl eframe::App for ExplorerApp {
             }
         });
 
-        // Status
         egui::TopBottomPanel::bottom("status_bar").show(ctx, |ui| {
             ui.horizontal(|ui| {
                 if self.searching || self.pasting {
@@ -880,11 +973,10 @@ impl eframe::App for ExplorerApp {
             });
         });
 
-        // Left sidebar
         egui::SidePanel::left("left")
             .resizable(true)
-            .default_width(230.0)
-            .width_range(180.0..=360.0)
+            .default_width(250.0)
+            .width_range(200.0..=400.0)
             .show(ctx, |ui| {
                 ui.heading("クイックアクセス");
                 egui::ScrollArea::vertical().show(ui, |ui| {
@@ -1011,29 +1103,10 @@ impl eframe::App for ExplorerApp {
                     });
 
                     ui.separator();
-                    ui.collapsing("表示", |ui| {
-                        ui.checkbox(&mut self.config.show_preview, "プレビュー");
-                        let mut dark = self.config.theme_dark;
-                        if ui.checkbox(&mut dark, "ダークテーマ").changed() {
-                            self.config.theme_dark = dark;
-                            if dark {
-                                ctx.set_visuals(egui::Visuals::dark());
-                            } else {
-                                ctx.set_visuals(egui::Visuals::light());
-                            }
-                        }
-                        if ui.button("設定を保存").clicked() {
-                            self.sync_config_from_state();
-                            match self.config.save() {
-                                Ok(()) => self.status = "設定を保存しました".into(),
-                                Err(e) => self.status = e,
-                            }
-                        }
-                    });
+                    self.ui_display_settings(ui, ctx);
                 });
             });
 
-        // Right preview
         if self.config.show_preview {
             egui::SidePanel::right("preview")
                 .resizable(true)
@@ -1136,9 +1209,7 @@ impl eframe::App for ExplorerApp {
                 });
         }
 
-        // Center file list
         egui::CentralPanel::default().show(ctx, |ui| {
-            // Breadcrumb + filter
             ui.horizontal_wrapped(|ui| {
                 let cur = self.current_tab().current.clone();
                 let mut acc = PathBuf::new();
@@ -1274,7 +1345,6 @@ impl ExplorerApp {
         let row_h = 22.0;
         let num_rows = entries.len().max(1);
 
-        // egui_extras 0.28 has no id_salt; unique id via Ui::push_id at call site.
         egui_extras::TableBuilder::new(ui)
             .striped(true)
             .resizable(true)
