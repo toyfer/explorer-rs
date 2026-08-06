@@ -56,5 +56,30 @@ fn main() -> eframe::Result {
 
 #[cfg(windows)]
 fn load_icon() -> egui::IconData {
-    egui::IconData::default()
+    // 32x32 RGBA generated programmatically (same design as ICO for consistency)
+    let mut rgba = Vec::with_capacity(32 * 32 * 4);
+    for y in 0..32 {
+        for x in 0..32 {
+            let (r, g, b, a) = icon_pixel(x, y);
+            rgba.extend_from_slice(&[r, g, b, a]);
+        }
+    }
+    egui::IconData { rgba, width: 32, height: 32 }
+}
+
+#[cfg(windows)]
+fn icon_pixel(x: u32, y: u32) -> (u8, u8, u8, u8) {
+    // top-down y (0=top) — mirror of build.rs ico_pixel but without bottom-up flip
+    let is_tab = y < 6 && x >= 2 && x < 14;
+    let is_body = y >= 6 && y < 28 && x >= 2 && x < 30;
+    let is_border = (is_tab || is_body) && (x == 2 || x == 29 || y == 6 || y == 27 || (is_tab && y == 2));
+    if is_tab || is_body {
+        if is_border { return (30, 58, 138, 255); }
+        let shade = if y < 12 { (59, 130, 246) } else { (37, 99, 235) };
+        if y >= 12 && y <= 13 && x >= 6 && x < 26 { return (255, 255, 255, 230); }
+        if y >= 16 && y <= 17 && x >= 6 && x < 26 { return (255, 255, 255, 230); }
+        if y >= 20 && y <= 21 && x >= 6 && x < 20 { return (255, 255, 255, 230); }
+        return (shade.0, shade.1, shade.2, 255);
+    }
+    (0, 0, 0, 0)
 }
