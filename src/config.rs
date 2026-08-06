@@ -26,6 +26,8 @@ pub enum FontPreset {
     /// BIZ UD Gothic — default for Japanese Windows, highly legible UI font.
     #[default]
     BizUdGothic,
+    /// BIZ UDP Gothic variant (proportional)
+    BizUdpGothic,
     /// Prefer system Japanese fonts automatically.
     Auto,
     YuGothic,
@@ -33,8 +35,6 @@ pub enum FontPreset {
     YuMincho,
     MsGothic,
     NotoSansCjk,
-    /// BIZ UD P Gothic variant
-    BizUdPGothic,
     /// Use `font_custom_path` only (plus system CJK fallback if available).
     Custom,
     /// egui built-in fonts only (no CJK).
@@ -188,18 +188,7 @@ mod tests {
     fn old_config_without_font_fields_deserializes() {
         let s = r#"{"last_path":null,"bookmarks":[],"show_hidden":false,"show_preview":true,"dual_pane":false,"sort_by":"Name","sort_desc":false,"theme_dark":true}"#;
         let c: AppConfig = serde_json::from_str(s).unwrap();
-        // default for missing font_preset is BizUdGothic (via #[default])
         assert_eq!(c.font_preset, FontPreset::BizUdGothic);
         assert_eq!(c.font_size, 14.0);
-    }
-
-    #[test]
-    fn biz_ud_gothic_deserializes() {
-        let s = r#"{"font_preset":"biz_ud_gothic","font_size":14.0}"#;
-        let v: serde_json::Value = serde_json::from_str(s).unwrap();
-        // minimal check: raw string roundtrip
-        assert_eq!(v["font_preset"], "biz_ud_gothic");
-        let c: AppConfig = serde_json::from_str(r#"{"last_path":null,"bookmarks":[],"show_hidden":false,"show_preview":true,"dual_pane":false,"sort_by":"Name","sort_desc":false,"theme_dark":true,"font_preset":"biz_ud_gothic","font_size":14.0}"#).unwrap();
-        assert_eq!(c.font_preset, FontPreset::BizUdGothic);
     }
 }

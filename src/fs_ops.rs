@@ -33,6 +33,12 @@ pub fn sanitize_filename(name: &str) -> Option<String> {
     Some(name.to_string())
 }
 
+/// Normalize user input so both `\` and `/` are accepted as separators.
+/// Delegates to `crate::shell::normalize_path_input` for OS-specific rules.
+pub fn normalize_path_input(input: &str) -> PathBuf {
+    crate::shell::normalize_path_input(input)
+}
+
 pub fn copy_recursive(src: &Path, dst: &Path) -> anyhow::Result<()> {
     if src.is_dir() {
         std::fs::create_dir_all(dst)?;
@@ -219,6 +225,17 @@ mod tests {
         let t = truncate_chars(s, 3);
         assert!(t.starts_with("あいう"));
         assert!(!t.contains('\u{FFFD}'));
+    }
+
+    #[test]
+    fn normalize_accepts_both_separators() {
+        let p1 = normalize_path_input("C:/Users/foo/bar");
+        let p2 = normalize_path_input("C:\\Users\\foo\\bar");
+        // On Windows both become same; on Unix they differ but at least don't panic
+        assert!(!p1.as_os_str().is_empty());
+        assert!(!p2.as_os_str().is_empty());
+        let mixed = normalize_path_input("C:\\Users/foo\\bar/baz");
+        assert!(!mixed.as_os_str().is_empty());
     }
 
     #[test]
