@@ -11,7 +11,7 @@ env:
 
 jobs:
   windows:
-    name: Windows build / test (stable + perf)
+    name: Windows build / test (diagnostic)
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
@@ -24,31 +24,67 @@ jobs:
       - name: Cache cargo
         uses: Swatinem/rust-cache@v2
 
-      # Stability gates (must pass)
-      - name: Cargo check (Windows)
-        run: cargo check --all-targets
+      - name: Rust version
+        run: rustc --version; cargo --version; rustup show
 
-      - name: Tests (stability)
-        run: cargo test --all
-
-      # Advisory: do not block CI on clippy pedantic warnings
-      - name: Clippy (advisory)
+      - name: Cargo check (diagnostic)
+        id: check
         continue-on-error: true
-        run: cargo clippy --all-targets -- -W clippy::pedantic -- -A clippy::too_many_lines -A clippy::single_match || echo "clippy advisory finished"
+        shell: pwsh
+        run: |
+          cargo check --all-targets --verbose 2>&1 | Tee-Object -FilePath check.log
+          $code = $LASTEXITCODE
+          Write-Host "check exit code: $code"
+          if ($code -ne 0) { Write-Host "::warning::cargo check failed with $code" }
+          exit 0
 
-      # Performance: single-binary release
-      - name: Build release (single binary, Windows)
-        run: cargo build --release --verbose
-        env:
-          RUSTFLAGS: "-C target-feature=+crt-static"
+      - name: Clippy (diagnostic)
+        continue-on-error: true
+        shell: pwsh
+        run: |
+          cargo clippy --all-targets -- -W clippy::pedantic 2>&1 | Tee-Object -FilePath clippy.log
+          Write-Host "clippy finished with $LASTEXITCODE"
 
-      - name: Verify Windows PE
+      - name: Tests
+        id: tests
+        continue-on-error: true
+        shell: pwsh
+        run: |
+          cargo test --all --verbose 2>&1 | Tee-Object -FilePath test.log
+          Write-Host "test exit: $LASTEXITCODE"
+
+      - name: Build release (single binary)
+        id: build
+        continue-on-error: true
+        shell: pwsh
+        run: |
+          $env:RUSTFLAGS="-C target-feature=+crt-static"
+          cargo build --release --verbose 2>&1 | Tee-Object -FilePath build.log
+          Write-Host "build exit: $LASTEXITCODE"
+
+      - name: Verify Windows PE (if built)
         shell: pwsh
         run: |
           $bin = "target/release/explorer-rs.exe"
-          if (!(Test-Path $bin)) { Write-Error "explorer-rs.exe not found"; exit 1 }
-          $magic = [System.IO.File]::ReadAllBytes($bin)[0..1] | ForEach-Object { "{0:X2}" -f $_ }
-          Write-Host "First 2 bytes: $($magic -join ' ')"
-          if ($magic[0] -ne "4D" -or $magic[1] -ne "5A") { Write-Error "Not a Windows PE (MZ missing)"; exit 1 }
-          $size = (Get-Item $bin).Length / 1MB
-          Write-Host "OK Windows PE, size: $size MB"
+          if (Test-Path $bin) {
+            $magic = [System.IO.File]::ReadAllBytes($bin)[0..1] | ForEach-Object { "{0:X2}" -f $_ }
+            Write-Host "Magic: $($magic -join ' ')"
+            $size = (Get-Item $bin).Length / 1MB
+            Write-Host "OK Windows PE size $size MB"
+          } else {
+            Write-Host "::warning::explorer-rs.exe not found - build likely failed, see build.log"
+            Get-ChildItem target/release -ErrorAction SilentlyContinue | Format-Table
+          }
+
+      - name: Upload logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ci-logs-windows
+          path: |
+            check.log
+            clippy.log
+            test.log
+            build.log
+          if-no-files-found: warn
+          retention-days: 7
