@@ -102,86 +102,96 @@ impl Tab {
         t
     }
 
-    pub fn refresh(&mut self) {
-        self.entries.clear();
-        self.selected.clear();
-        self.focus = None;
-        self.anchor = None;
-        self.error = None;
-        let rd = match std::fs::read_dir(&self.current) {
-            Ok(rd) => rd,
-            Err(e) => {
-                self.error = Some(format!("読み取り失敗: {e}"));
-                return;
+    /// Blocking directory scan used by background workers.
+    pub fn list_blocking(dir: &Path, show_hidden: bool, filter: &str) -> (Vec<FileEntry>, Option<String>) {
+        let mut entries = Vec::new();
+        let mut error = None;
+        match std::fs::read_dir(dir) {
+            Ok(rd) => {
+                let filter_lc = filter.to_lowercase();
+                for e in rd.flatten() {
+                    let path = e.path();
+                    if let Some(entry) = FileEntry::from_path(&path) {
+                        if !show_hidden && entry.is_hidden {
+                            continue;
+                        }
+                        if !filter_lc.is_empty() && !entry.name.to_lowercase().contains(&filter_lc) {
+                            continue;
+                        }
+                        entries.push(entry);
+                    }
+                }
             }
-        };
-        let filter_lc = self.filter.to_lowercase();
-        for e in rd.flatten() {
-            let path = e.path();
-            if let Some(entry) = FileEntry::from_path(&path) {
-                if !self.show_hidden && entry.is_hidden {
-                    continue;
-                }
-                if !filter_lc.is_empty() && !entry.name.to_lowercase().contains(&filter_lc) {
-                    continue;
-                }
-                self.entries.push(entry);
+            Err(e) => error = Some(format!("読み取り失敗: {e}")),
+        }
+        (entries, error)
+    }
+
+    /// Sort helper that can be called from background thread (no selection remap).
+    pub fn sort_entries(entries: &mut Vec<FileEntry>, sort_by: SortBy, sort_desc: bool) {
+        match sort_by {
+            SortBy::Name => entries.sort_by(|a, b| {
+                let ord = b.is_dir.cmp(&a.is_dir).then(a.name.to_lowercase().cmp(&b.name.to_lowercase()));
+                if sort_desc { ord.reverse() } else { ord }
+            }),
+            SortBy::Size => entries.sort_by(|a, b| {
+                let ord = b.is_dir.cmp(&a.is_dir).then(a.size.cmp(&b.size));
+                if sort_desc { ord.reverse() } else { ord }
+            }),
+            SortBy::Modified => entries.sort_by(|a, b| {
+                let ord = b.is_dir.cmp(&a.is_dir).then(a.modified.cmp(&b.modified));
+                if sort_desc { ord.reverse() } else { ord }
+            }),
+            SortBy::Type => entries.sort_by(|a, b| {
+                let ord = b.is_dir.cmp(&a.is_dir).then(a.ext.cmp(&b.ext)).then(a.name.to_lowercase().cmp(&b.name.to_lowercase()));
+                if sort_desc { ord.reverse() } else { ord }
+            }),
+        }
+    }
+
+    /// Apply a background list result, preserving selection by path.
+    pub fn apply_list(&mut self, entries: Vec<FileEntry>, error: Option<String>) {
+        let selected_paths: Vec<PathBuf> = self.selected.iter().filter_map(|&i| self.entries.get(i).map(|e| e.path.clone())).collect();
+        let focus_path = self.focus.and_then(|i| self.entries.get(i).map(|e| e.path.clone()));
+        self.entries = entries;
+        self.error = error;
+        self.selected.clear();
+        for (i, e) in self.entries.iter().enumerate() {
+            if selected_paths.iter().any(|p| p == &e.path) {
+                self.selected.insert(i);
             }
         }
-        self.sort();
+        self.focus = focus_path.and_then(|p| self.entries.iter().position(|e| e.path == p));
+        self.anchor = self.focus;
+    }
+
+    pub fn refresh(&mut self) {
+        let (mut entries, error) = Self::list_blocking(&self.current, self.show_hidden, &self.filter);
+        Self::sort_entries(&mut entries, self.sort_by, self.sort_desc);
+        // preserve selection for synchronous path as well
+        let selected_paths: Vec<PathBuf> = self.selected.iter().filter_map(|&i| self.entries.get(i).map(|e| e.path.clone())).collect();
+        let focus_path = self.focus.and_then(|i| self.entries.get(i).map(|e| e.path.clone()));
+        self.entries = entries;
+        self.error = error;
+        self.selected.clear();
+        for (i, e) in self.entries.iter().enumerate() {
+            if selected_paths.iter().any(|p| p == &e.path) {
+                self.selected.insert(i);
+            }
+        }
+        if focus_path.is_some() {
+            self.focus = focus_path.and_then(|p| self.entries.iter().position(|e| e.path == p));
+            self.anchor = self.focus;
+        } else {
+            self.focus = None;
+            self.anchor = None;
+        }
     }
 
     pub fn sort(&mut self) {
-        let selected_paths: Vec<PathBuf> = self
-            .selected
-            .iter()
-            .filter_map(|&i| self.entries.get(i).map(|e| e.path.clone()))
-            .collect();
+        let selected_paths: Vec<PathBuf> = self.selected.iter().filter_map(|&i| self.entries.get(i).map(|e| e.path.clone())).collect();
         let focus_path = self.focus.and_then(|i| self.entries.get(i).map(|e| e.path.clone()));
-
-        let desc = self.sort_desc;
-        match self.sort_by {
-            SortBy::Name => self.entries.sort_by(|a, b| {
-                let ord = b
-                    .is_dir
-                    .cmp(&a.is_dir)
-                    .then(a.name.to_lowercase().cmp(&b.name.to_lowercase()));
-                if desc {
-                    ord.reverse()
-                } else {
-                    ord
-                }
-            }),
-            SortBy::Size => self.entries.sort_by(|a, b| {
-                let ord = b.is_dir.cmp(&a.is_dir).then(a.size.cmp(&b.size));
-                if desc {
-                    ord.reverse()
-                } else {
-                    ord
-                }
-            }),
-            SortBy::Modified => self.entries.sort_by(|a, b| {
-                let ord = b.is_dir.cmp(&a.is_dir).then(a.modified.cmp(&b.modified));
-                if desc {
-                    ord.reverse()
-                } else {
-                    ord
-                }
-            }),
-            SortBy::Type => self.entries.sort_by(|a, b| {
-                let ord = b
-                    .is_dir
-                    .cmp(&a.is_dir)
-                    .then(a.ext.cmp(&b.ext))
-                    .then(a.name.to_lowercase().cmp(&b.name.to_lowercase()));
-                if desc {
-                    ord.reverse()
-                } else {
-                    ord
-                }
-            }),
-        }
-
+        Self::sort_entries(&mut self.entries, self.sort_by, self.sort_desc);
         self.selected.clear();
         for (i, e) in self.entries.iter().enumerate() {
             if selected_paths.iter().any(|p| p == &e.path) {
@@ -237,16 +247,11 @@ impl Tab {
     }
 
     pub fn primary_selected(&self) -> Option<&FileEntry> {
-        self.focus
-            .and_then(|i| self.entries.get(i))
-            .or_else(|| self.selected.iter().next().and_then(|&i| self.entries.get(i)))
+        self.focus.and_then(|i| self.entries.get(i)).or_else(|| self.selected.iter().next().and_then(|&i| self.entries.get(i)))
     }
 
     pub fn selected_paths(&self) -> Vec<PathBuf> {
-        self.selected
-            .iter()
-            .filter_map(|&i| self.entries.get(i).map(|e| e.path.clone()))
-            .collect()
+        self.selected.iter().filter_map(|&i| self.entries.get(i).map(|e| e.path.clone())).collect()
     }
 
     pub fn select_only(&mut self, idx: usize) {
@@ -276,11 +281,7 @@ impl Tab {
             return;
         }
         let anchor = self.anchor.unwrap_or(idx);
-        let (a, b) = if anchor <= idx {
-            (anchor, idx)
-        } else {
-            (idx, anchor)
-        };
+        let (a, b) = if anchor <= idx { (anchor, idx) } else { (idx, anchor) };
         self.selected.clear();
         for i in a..=b {
             self.selected.insert(i);
@@ -319,12 +320,7 @@ impl Tab {
         }
         let q = query.to_lowercase();
         let mut results = Vec::new();
-        for entry in WalkDir::new(root)
-            .max_depth(6)
-            .follow_links(false)
-            .into_iter()
-            .filter_map(|e| e.ok())
-        {
+        for entry in WalkDir::new(root).max_depth(6).follow_links(false).into_iter().filter_map(|e| e.ok()) {
             if results.len() >= max_results {
                 break;
             }
@@ -346,16 +342,9 @@ mod tests {
     use super::*;
     use crate::config::SortBy;
     use std::fs;
-
     #[test]
     fn sort_dirs_first() {
-        let dir = std::env::temp_dir().join(format!(
-            "explorer-rs-tab-{}",
-            std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .unwrap()
-                .as_nanos()
-        ));
+        let dir = std::env::temp_dir().join(format!("explorer-rs-tab-{}", std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_nanos()));
         fs::create_dir_all(dir.join("sub")).unwrap();
         fs::write(dir.join("a.txt"), b"x").unwrap();
         fs::write(dir.join("z.txt"), b"y").unwrap();
@@ -364,16 +353,9 @@ mod tests {
         assert_eq!(tab.entries[0].name, "sub");
         let _ = fs::remove_dir_all(dir);
     }
-
     #[test]
     fn multi_select_range() {
-        let dir = std::env::temp_dir().join(format!(
-            "explorer-rs-sel-{}",
-            std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .unwrap()
-                .as_nanos()
-        ));
+        let dir = std::env::temp_dir().join(format!("explorer-rs-sel-{}", std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_nanos()));
         fs::create_dir_all(&dir).unwrap();
         for i in 0..5 {
             fs::write(dir.join(format!("f{i}.txt")), b"x").unwrap();
@@ -384,6 +366,19 @@ mod tests {
         assert_eq!(tab.selected.len(), 3);
         tab.select_all();
         assert_eq!(tab.selected.len(), tab.entries.len());
+        let _ = fs::remove_dir_all(dir);
+    }
+    #[test]
+    fn list_blocking_filters_hidden() {
+        let dir = std::env::temp_dir().join(format!("explorer-rs-hidden-{}", std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_nanos()));
+        fs::create_dir_all(&dir).unwrap();
+        fs::write(dir.join(".hidden"), b"x").unwrap();
+        fs::write(dir.join("visible.txt"), b"x").unwrap();
+        let (entries, _) = Tab::list_blocking(&dir, false, "");
+        assert_eq!(entries.len(), 1);
+        assert_eq!(entries[0].name, "visible.txt");
+        let (entries2, _) = Tab::list_blocking(&dir, true, "");
+        assert_eq!(entries2.len(), 2);
         let _ = fs::remove_dir_all(dir);
     }
 }
