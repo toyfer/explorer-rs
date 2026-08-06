@@ -3,6 +3,7 @@
 mod app;
 mod commands;
 mod config;
+mod fonts;
 mod fs_ops;
 mod tab;
 
@@ -40,20 +41,19 @@ fn main() -> eframe::Result {
         native_options,
         Box::new(move |cc| {
             egui_extras::install_image_loaders(&cc.egui_ctx);
-            cc.egui_ctx.set_zoom_factor(1.0);
-            let mut style = (*cc.egui_ctx.style()).clone();
-            style.interaction.selectable_labels = false;
-            style.text_styles.insert(
-                egui::TextStyle::Small,
-                egui::FontId::new(11.0, egui::FontFamily::Proportional),
-            );
+
+            // Japanese / CJK fonts + size (must run before first frame)
+            let font_status = fonts::apply_fonts(&cc.egui_ctx, &config);
+
             if config.theme_dark {
                 cc.egui_ctx.set_visuals(egui::Visuals::dark());
             } else {
                 cc.egui_ctx.set_visuals(egui::Visuals::light());
             }
-            cc.egui_ctx.set_style(style);
-            Ok(Box::new(ExplorerApp::new(start_path, config, cc)))
+
+            let mut app = ExplorerApp::new(start_path, config, cc);
+            app.status = format!("準備完了 — {font_status}");
+            Ok(Box::new(app))
         }),
     )
 }

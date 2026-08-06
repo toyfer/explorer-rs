@@ -12,6 +12,29 @@ pub struct AppConfig {
     pub sort_by: SortBy,
     pub sort_desc: bool,
     pub theme_dark: bool,
+    /// Font family preset for Japanese / UI text.
+    pub font_preset: FontPreset,
+    /// Optional path to a custom .ttf / .otf / .ttc file.
+    pub font_custom_path: Option<String>,
+    /// Base UI font size in points (Body).
+    pub font_size: f32,
+}
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Default)]
+#[serde(rename_all = "snake_case")]
+pub enum FontPreset {
+    /// Prefer system Japanese fonts automatically.
+    #[default]
+    Auto,
+    YuGothic,
+    Meiryo,
+    YuMincho,
+    MsGothic,
+    NotoSansCjk,
+    /// Use `font_custom_path` only (plus system CJK fallback if available).
+    Custom,
+    /// egui built-in fonts only (no CJK).
+    Default,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -40,6 +63,9 @@ impl Default for AppConfig {
             sort_by: SortBy::Name,
             sort_desc: false,
             theme_dark: true,
+            font_preset: FontPreset::Auto,
+            font_custom_path: None,
+            font_size: 14.0,
         }
     }
 }
@@ -52,7 +78,10 @@ impl AppConfig {
     pub fn load() -> Self {
         if let Some(p) = Self::path() {
             if let Ok(s) = std::fs::read_to_string(&p) {
-                if let Ok(c) = serde_json::from_str::<AppConfig>(&s) {
+                if let Ok(mut c) = serde_json::from_str::<AppConfig>(&s) {
+                    if c.font_size < 10.0 || c.font_size > 28.0 {
+                        c.font_size = 14.0;
+                    }
                     return c;
                 }
             }
@@ -132,6 +161,9 @@ mod tests {
             sort_by: SortBy::Size,
             sort_desc: true,
             theme_dark: false,
+            font_preset: FontPreset::Meiryo,
+            font_custom_path: Some("C:\\Fonts\\x.ttf".into()),
+            font_size: 16.0,
         };
         let s = serde_json::to_string(&c).unwrap();
         let back: AppConfig = serde_json::from_str(&s).unwrap();
@@ -139,5 +171,15 @@ mod tests {
         assert!(back.dual_pane);
         assert_eq!(back.sort_by, SortBy::Size);
         assert!(!back.theme_dark);
+        assert_eq!(back.font_preset, FontPreset::Meiryo);
+        assert_eq!(back.font_size, 16.0);
+    }
+
+    #[test]
+    fn old_config_without_font_fields_deserializes() {
+        let s = r#"{"last_path":null,"bookmarks":[],"show_hidden":false,"show_preview":true,"dual_pane":false,"sort_by":"Name","sort_desc":false,"theme_dark":true}"#;
+        let c: AppConfig = serde_json::from_str(s).unwrap();
+        assert_eq!(c.font_preset, FontPreset::Auto);
+        assert_eq!(c.font_size, 14.0);
     }
 }
