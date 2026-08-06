@@ -2,25 +2,21 @@ name: CI
 
 on:
   push:
-    branches: [ main, master, develop ]
+    branches: [ main ]
   pull_request:
-    branches: [ main, master ]
+    branches: [ main ]
 
 env:
   CARGO_TERM_COLOR: always
 
 jobs:
-  check:
-    name: Check / Clippy / Test
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [ubuntu-latest, windows-latest]
-    runs-on: ${{ matrix.os }}
+  windows:
+    name: Windows build / test (stable + perf)
+    runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install Rust
+      - name: Install Rust stable
         uses: dtolnay/rust-toolchain@stable
         with:
           components: clippy
@@ -28,25 +24,29 @@ jobs:
       - name: Cache cargo
         uses: Swatinem/rust-cache@v2
 
-      - name: Linux GUI deps
-        if: runner.os == 'Linux'
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y \
-            libgl1-mesa-dev libxcb1-dev libxrandr-dev libxinerama-dev \
-            libxcursor-dev libxi-dev libxkbcommon-dev \
-            libdbus-1-dev pkg-config
-
+      # Stability: check, clippy, tests
       - name: Cargo check
         run: cargo check --all-targets
 
-      - name: Clippy
+      - name: Clippy (warnings allowed, errors fail)
         run: cargo clippy --all-targets -- -W clippy::all
 
       - name: Tests
-        run: cargo test
+        run: cargo test --all
 
-      - name: Build release (smoke)
-        run: cargo build --release
+      # Performance: release smoke build with single-binary flags
+      - name: Build release (single binary, Windows)
+        run: cargo build --release --verbose
         env:
-          RUSTFLAGS: ${{ runner.os == 'Windows' && '-C target-feature=+crt-static' || '' }}
+          RUSTFLAGS: "-C target-feature=+crt-static"
+
+      - name: Verify Windows PE
+        shell: pwsh
+        run: |
+          $bin = "target/release/explorer-rs.exe"
+          if (!(Test-Path $bin)) { Write-Error "explorer-rs.exe not found"; exit 1 }
+          $magic = [System.IO.File]::ReadAllBytes($bin)[0..1] | ForEach-Object { "{0:X2}" -f $_ }
+          Write-Host "First 2 bytes: $($magic -join ' ')"
+          if ($magic[0] -ne "4D" -or $magic[1] -ne "5A") { Write-Error "Not a Windows PE (MZ missing)"; exit 1 }
+          $size = (Get-Item $bin).Length / 1MB
+          Write-Host "OK Windows PE, size: $size MB"
