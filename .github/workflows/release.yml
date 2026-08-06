@@ -18,9 +18,10 @@ env:
   CARGO_TERM_COLOR: always
   BIN_NAME: explorer-rs
 
+# Windows only: stability + performance + fonts are the only priorities
 jobs:
   build-windows:
-    name: Build Windows x86_64
+    name: Build Windows x86_64 (single binary)
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
@@ -30,26 +31,25 @@ jobs:
         with:
           targets: x86_64-pc-windows-msvc
 
-      - name: Cache cargo
+      - name: Cache cargo (perf)
         uses: Swatinem/rust-cache@v2
 
-      - name: Build release (single binary)
+      - name: Build release (single binary, crt-static, lto)
         run: cargo build --release --verbose
         env:
           RUSTFLAGS: "-C target-feature=+crt-static"
 
-      - name: Check binary size
+      - name: Verify Windows PE + size
         shell: pwsh
         run: |
           $bin = "target/release/${{ env.BIN_NAME }}.exe"
-          if (Test-Path $bin) {
-            $size = (Get-Item $bin).Length / 1MB
-            Write-Host "Binary size: $size MB"
-            Get-Item $bin | Format-List
-          } else {
-            Write-Error "Binary not found at $bin"
-            exit 1
-          }
+          if (!(Test-Path $bin)) { Write-Error "explorer-rs.exe not found"; exit 1 }
+          $magic = [System.IO.File]::ReadAllBytes($bin)[0..1] | ForEach-Object { "{0:X2}" -f $_ }
+          Write-Host "Magic: $($magic -join ' ')"
+          if ($magic[0] -ne "4D" -or $magic[1] -ne "5A") { Write-Error "Not a Windows PE"; exit 1 }
+          $size = (Get-Item $bin).Length / 1MB
+          Write-Host "Windows PE verified, size: $size MB"
+          Get-Item $bin | Format-List
 
       - name: Create portable zip
         shell: pwsh
@@ -69,6 +69,7 @@ jobs:
           ========================================
           explorer-rs.exe をダブルクリックで起動できます。
           インストーラ不要の単一バイナリです。
+          日本語フォントは自動で游ゴシック/メイリオ等を読み込み、左「表示」で変更できます。
           設定は %APPDATA%\explorer-rs\config.json に保存されます。
           "@ | Out-File -Encoding utf8 "$dist/README_PORTABLE.txt"
           $zip = "${{ env.BIN_NAME }}-windows-x86_64-$version.zip"
@@ -80,8 +81,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: explorer-rs-windows-x86_64
-          path: |
-            *.zip
+          path: "*.zip"
           retention-days: 30
 
       - name: Upload artifact (exe)
@@ -104,31 +104,16 @@ jobs:
           body: |
             ## explorer-rs ${{ github.ref_name }}
 
-            Windows 向け**単一バイナリ**のポータブル版です（PE / .exe）。
+            Windows 向け**単一バイナリ**のポータブル版です。
+
+            - 日本語フォント自動対応（游ゴシック/メイリオ等）、「表示」で変更可能
+            - 安定性・パフォーマンス重視のリリースビルド
 
             ### ダウンロード
             - `explorer-rs-windows-x86_64-${{ github.ref_name }}.zip` — 推奨
-            - `explorer-rs.exe` — 単体バイナリ
+            - `explorer-rs.exe` — 単体
 
             ### 使い方
             1. zip を解凍
             2. `explorer-rs.exe` をダブルクリック
             3. 設定は `%APPDATA%\explorer-rs\config.json` に自動保存
-
-  build-linux:
-    name: Build Linux x86_64 (verify)
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@stable
-      - uses: Swatinem/rust-cache@v2
-      - name: Install deps (egui glow)
-        run: sudo apt-get update && sudo apt-get install -y libgl1-mesa-dev libxcb1-dev libxrandr-dev libxinerama-dev libxcursor-dev libxi-dev libxkbcommon-dev
-      - name: Build release
-        run: cargo build --release --verbose
-      - name: Upload linux artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: explorer-rs-linux-x86_64
-          path: target/release/explorer-rs
-          retention-days: 14
