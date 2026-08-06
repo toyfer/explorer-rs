@@ -6,7 +6,6 @@
 //! Proportional / Monospace fallback chains.
 
 use std::path::{Path, PathBuf};
-use std::sync::Arc;
 
 use eframe::egui::{FontData, FontDefinitions, FontFamily, FontId, TextStyle};
 
@@ -162,10 +161,9 @@ pub fn apply_fonts(ctx: &eframe::egui::Context, config: &AppConfig) -> String {
 
     if let Some(ref path) = custom_path {
         if let Some(bytes) = load_font_bytes(path) {
-            fonts.font_data.insert(
-                CUSTOM_FONT_KEY.to_owned(),
-                Arc::new(FontData::from_owned(bytes)),
-            );
+            fonts
+                .font_data
+                .insert(CUSTOM_FONT_KEY.to_owned(), FontData::from_owned(bytes));
             has_custom = true;
             loaded_name = format!(
                 "カスタム: {}",
@@ -185,10 +183,9 @@ pub fn apply_fonts(ctx: &eframe::egui::Context, config: &AppConfig) -> String {
         };
         let candidates = system_cjk_candidates(load_preset);
         if let Some((path, bytes)) = find_first_font(&candidates) {
-            fonts.font_data.insert(
-                CJK_FONT_KEY.to_owned(),
-                Arc::new(FontData::from_owned(bytes)),
-            );
+            fonts
+                .font_data
+                .insert(CJK_FONT_KEY.to_owned(), FontData::from_owned(bytes));
             has_cjk = true;
             if !has_custom {
                 loaded_name = path
