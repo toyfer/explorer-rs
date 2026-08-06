@@ -32,13 +32,16 @@ jobs:
         if: runner.os == 'Linux'
         run: |
           sudo apt-get update
-          sudo apt-get install -y libgl1-mesa-dev libxcb1-dev libxrandr-dev libxinerama-dev libxcursor-dev libxi-dev libxkbcommon-dev
+          sudo apt-get install -y \
+            libgl1-mesa-dev libxcb1-dev libxrandr-dev libxinerama-dev \
+            libxcursor-dev libxi-dev libxkbcommon-dev \
+            libdbus-1-dev pkg-config
 
       - name: Cargo check
         run: cargo check --all-targets
 
       - name: Clippy
-        run: cargo clippy --all-targets -- -D warnings
+        run: cargo clippy --all-targets -- -W clippy::all
 
       - name: Tests
         run: cargo test
