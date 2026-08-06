@@ -23,16 +23,18 @@ pub struct AppConfig {
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Default)]
 #[serde(rename_all = "snake_case")]
 pub enum FontPreset {
-    /// BIZ UD Gothic as default (Windows standard for Explorer-like readability).
+    /// BIZ UD Gothic — default for Japanese Windows, highly legible UI font.
     #[default]
     BizUdGothic,
-    BizUdpGothic,
+    /// Prefer system Japanese fonts automatically.
     Auto,
     YuGothic,
     Meiryo,
     YuMincho,
     MsGothic,
     NotoSansCjk,
+    /// BIZ UD P Gothic variant
+    BizUdPGothic,
     /// Use `font_custom_path` only (plus system CJK fallback if available).
     Custom,
     /// egui built-in fonts only (no CJK).
@@ -76,6 +78,7 @@ impl AppConfig {
     fn path() -> Option<PathBuf> {
         dirs::config_dir().map(|p| p.join("explorer-rs").join("config.json"))
     }
+
     pub fn load() -> Self {
         if let Some(p) = Self::path() {
             if let Ok(s) = std::fs::read_to_string(&p) {
@@ -89,31 +92,49 @@ impl AppConfig {
         }
         let mut c = Self::default();
         if let Some(home) = dirs::home_dir() {
-            c.bookmarks.push(Bookmark { name: "ホーム".into(), path: home });
+            c.bookmarks.push(Bookmark {
+                name: "ホーム".into(),
+                path: home,
+            });
         }
         if let Some(d) = dirs::desktop_dir() {
-            c.bookmarks.push(Bookmark { name: "デスクトップ".into(), path: d });
+            c.bookmarks.push(Bookmark {
+                name: "デスクトップ".into(),
+                path: d,
+            });
         }
         if let Some(d) = dirs::document_dir() {
-            c.bookmarks.push(Bookmark { name: "ドキュメント".into(), path: d });
+            c.bookmarks.push(Bookmark {
+                name: "ドキュメント".into(),
+                path: d,
+            });
         }
         if let Some(d) = dirs::download_dir() {
-            c.bookmarks.push(Bookmark { name: "ダウンロード".into(), path: d });
+            c.bookmarks.push(Bookmark {
+                name: "ダウンロード".into(),
+                path: d,
+            });
         }
         #[cfg(windows)]
         {
             for d in ["C:\\", "D:\\", "E:\\"] {
                 let p = PathBuf::from(d);
                 if p.exists() && !c.bookmarks.iter().any(|b| b.path == p) {
-                    c.bookmarks.push(Bookmark { name: d.into(), path: p });
+                    c.bookmarks.push(Bookmark {
+                        name: d.into(),
+                        path: p,
+                    });
                 }
             }
         }
         c
     }
+
     pub fn save(&self) -> Result<(), String> {
         let p = Self::path().ok_or_else(|| "設定ディレクトリを解決できません".to_string())?;
-        let parent = p.parent().ok_or_else(|| "設定パスが不正です".to_string())?;
+        let parent = p
+            .parent()
+            .ok_or_else(|| "設定パスが不正です".to_string())?;
         std::fs::create_dir_all(parent).map_err(|e| format!("設定フォルダ作成失敗: {e}"))?;
         let s = serde_json::to_string_pretty(self).map_err(|e| format!("設定シリアライズ失敗: {e}"))?;
         std::fs::write(&p, s).map_err(|e| format!("設定書き込み失敗: {e}"))?;
@@ -124,29 +145,61 @@ impl AppConfig {
 #[cfg(test)]
 mod tests {
     use super::*;
+
     #[test]
-    fn default_sort() { assert_eq!(SortBy::default(), SortBy::Name); }
+    fn default_sort() {
+        assert_eq!(SortBy::default(), SortBy::Name);
+    }
+
+    #[test]
+    fn default_font_is_biz_ud_gothic() {
+        assert_eq!(AppConfig::default().font_preset, FontPreset::BizUdGothic);
+    }
+
     #[test]
     fn roundtrip_json() {
         let c = AppConfig {
             last_path: Some(PathBuf::from("/tmp")),
-            bookmarks: vec![Bookmark { name: "t".into(), path: PathBuf::from("/tmp") }],
-            show_hidden: true, show_preview: false, dual_pane: true,
-            sort_by: SortBy::Size, sort_desc: true, theme_dark: false,
+            bookmarks: vec![Bookmark {
+                name: "t".into(),
+                path: PathBuf::from("/tmp"),
+            }],
+            show_hidden: true,
+            show_preview: false,
+            dual_pane: true,
+            sort_by: SortBy::Size,
+            sort_desc: true,
+            theme_dark: false,
             font_preset: FontPreset::BizUdGothic,
-            font_custom_path: Some("C:\\Fonts\\x.ttf".into()), font_size: 16.0,
+            font_custom_path: Some("C:\\Fonts\\x.ttf".into()),
+            font_size: 16.0,
         };
         let s = serde_json::to_string(&c).unwrap();
         let back: AppConfig = serde_json::from_str(&s).unwrap();
-        assert!(back.show_hidden); assert!(back.dual_pane);
-        assert_eq!(back.sort_by, SortBy::Size); assert!(!back.theme_dark);
-        assert_eq!(back.font_preset, FontPreset::BizUdGothic); assert_eq!(back.font_size, 16.0);
+        assert!(back.show_hidden);
+        assert!(back.dual_pane);
+        assert_eq!(back.sort_by, SortBy::Size);
+        assert!(!back.theme_dark);
+        assert_eq!(back.font_preset, FontPreset::BizUdGothic);
+        assert_eq!(back.font_size, 16.0);
     }
+
     #[test]
     fn old_config_without_font_fields_deserializes() {
         let s = r#"{"last_path":null,"bookmarks":[],"show_hidden":false,"show_preview":true,"dual_pane":false,"sort_by":"Name","sort_desc":false,"theme_dark":true}"#;
         let c: AppConfig = serde_json::from_str(s).unwrap();
+        // default for missing font_preset is BizUdGothic (via #[default])
         assert_eq!(c.font_preset, FontPreset::BizUdGothic);
         assert_eq!(c.font_size, 14.0);
+    }
+
+    #[test]
+    fn biz_ud_gothic_deserializes() {
+        let s = r#"{"font_preset":"biz_ud_gothic","font_size":14.0}"#;
+        let v: serde_json::Value = serde_json::from_str(s).unwrap();
+        // minimal check: raw string roundtrip
+        assert_eq!(v["font_preset"], "biz_ud_gothic");
+        let c: AppConfig = serde_json::from_str(r#"{"last_path":null,"bookmarks":[],"show_hidden":false,"show_preview":true,"dual_pane":false,"sort_by":"Name","sort_desc":false,"theme_dark":true,"font_preset":"biz_ud_gothic","font_size":14.0}"#).unwrap();
+        assert_eq!(c.font_preset, FontPreset::BizUdGothic);
     }
 }
