@@ -1,0 +1,54 @@
+   Compiling explorer-rs v0.1.1 (D:\a\explorer-rs\explorer-rs)
+warning: explorer-rs@0.1.1: skipping icon embed (no valid assets/icon.ico)
+error[E0308]: mismatched types
+   --> src\fonts.rs:167:17
+    |
+165 |             fonts.font_data.insert(
+    |                             ------ arguments to this method are incorrect
+166 |                 CUSTOM_FONT_KEY.to_owned(),
+167 |                 Arc::new(FontData::from_owned(bytes)),
+    |                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ expected `FontData`, found `Arc<FontData>`
+    |
+    = note: expected struct `eframe::egui::FontData`
+               found struct `std::sync::Arc<eframe::egui::FontData>`
+help: the return type of this call is `std::sync::Arc<eframe::egui::FontData>` due to the type of the argument passed
+   --> src\fonts.rs:165:13
+    |
+165 | /             fonts.font_data.insert(
+166 | |                 CUSTOM_FONT_KEY.to_owned(),
+167 | |                 Arc::new(FontData::from_owned(bytes)),
+    | |                 ------------------------------------- this argument influences the return type of `insert`
+168 | |             );
+    | |_____________^
+note: method defined here
+   --> /rustc/8bab26f4f68e0e26f0bb7960be334d5b520ea452/library\alloc\src\collections\btree\map.rs:1045:11
+
+error[E0308]: mismatched types
+   --> src\fonts.rs:190:17
+    |
+188 |             fonts.font_data.insert(
+    |                             ------ arguments to this method are incorrect
+189 |                 CJK_FONT_KEY.to_owned(),
+190 |                 Arc::new(FontData::from_owned(bytes)),
+    |                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ expected `FontData`, found `Arc<FontData>`
+    |
+    = note: expected struct `eframe::egui::FontData`
+               found struct `std::sync::Arc<eframe::egui::FontData>`
+help: the return type of this call is `std::sync::Arc<eframe::egui::FontData>` due to the type of the argument passed
+   --> src\fonts.rs:188:13
+    |
+188 | /             fonts.font_data.insert(
+189 | |                 CJK_FONT_KEY.to_owned(),
+190 | |                 Arc::new(FontData::from_owned(bytes)),
+    | |                 ------------------------------------- this argument influences the return type of `insert`
+191 | |             );
+    | |_____________^
+note: method defined here
+   --> /rustc/8bab26f4f68e0e26f0bb7960be334d5b520ea452/library\alloc\src\collections\btree\map.rs:1045:11
+
+For more information about this error, try `rustc --explain E0308`.
+warning: explorer-rs@0.1.1: skipping icon embed (no valid assets/icon.ico)
+error: could not compile `explorer-rs` (bin "explorer-rs") due to 2 previous errors
+warning: build failed, waiting for other jobs to finish...
+warning: explorer-rs@0.1.1: skipping icon embed (no valid assets/icon.ico)
+error: could not compile `explorer-rs` (bin "explorer-rs" test) due to 2 previous errors
