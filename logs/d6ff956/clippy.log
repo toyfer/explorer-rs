@@ -1,0 +1,276 @@
+   Compiling explorer-rs v0.1.1 (D:\a\explorer-rs\explorer-rs)
+warning: manual `Range::contains` implementation
+   --> build.rs:104:28
+    |
+104 |     let is_tab = ty < 6 && x >= 2 && x < 14;
+    |                            ^^^^^^^^^^^^^^^^ help: use: `(2..14).contains(&x)`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.97.0/index.html#manual_range_contains
+    = note: `-W clippy::manual-range-contains` implied by `-W clippy::all`
+    = help: to override `-W clippy::all` add `#[allow(clippy::manual_range_contains)]`
+
+warning: manual `Range::contains` implementation
+   --> build.rs:105:41
+    |
+105 |     let is_body = ty >= 6 && ty < 28 && x >= 2 && x < 30;
+    |                                         ^^^^^^^^^^^^^^^^ help: use: `(2..30).contains(&x)`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.97.0/index.html#manual_range_contains
+
+warning: manual `Range::contains` implementation
+   --> build.rs:105:19
+    |
+105 |     let is_body = ty >= 6 && ty < 28 && x >= 2 && x < 30;
+    |                   ^^^^^^^^^^^^^^^^^^ help: use: `(6..28).contains(&ty)`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.97.0/index.html#manual_range_contains
+
+warning: manual `Range::contains` implementation
+   --> build.rs:114:36
+    |
+114 |         if ty >= 12 && ty <= 13 && x >= 6 && x < 26 { return (255, 255, 255, 230); }
+    |                                    ^^^^^^^^^^^^^^^^ help: use: `(6..26).contains(&x)`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.97.0/index.html#manual_range_contains
+
+warning: manual `RangeInclusive::contains` implementation
+   --> build.rs:114:12
+    |
+114 |         if ty >= 12 && ty <= 13 && x >= 6 && x < 26 { return (255, 255, 255, 230); }
+    |            ^^^^^^^^^^^^^^^^^^^^ help: use: `(12..=13).contains(&ty)`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.97.0/index.html#manual_range_contains
+
+warning: manual `Range::contains` implementation
+   --> build.rs:115:36
+    |
+115 |         if ty >= 16 && ty <= 17 && x >= 6 && x < 26 { return (255, 255, 255, 230); }
+    |                                    ^^^^^^^^^^^^^^^^ help: use: `(6..26).contains(&x)`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.97.0/index.html#manual_range_contains
+
+warning: manual `RangeInclusive::contains` implementation
+   --> build.rs:115:12
+    |
+115 |         if ty >= 16 && ty <= 17 && x >= 6 && x < 26 { return (255, 255, 255, 230); }
+    |            ^^^^^^^^^^^^^^^^^^^^ help: use: `(16..=17).contains(&ty)`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.97.0/index.html#manual_range_contains
+
+warning: manual `Range::contains` implementation
+   --> build.rs:116:36
+    |
+116 |         if ty >= 20 && ty <= 21 && x >= 6 && x < 20 { return (255, 255, 255, 230); }
+    |                                    ^^^^^^^^^^^^^^^^ help: use: `(6..20).contains(&x)`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.97.0/index.html#manual_range_contains
+
+warning: manual `RangeInclusive::contains` implementation
+   --> build.rs:116:12
+    |
+116 |         if ty >= 20 && ty <= 21 && x >= 6 && x < 20 { return (255, 255, 255, 230); }
+    |            ^^^^^^^^^^^^^^^^^^^^ help: use: `(20..=21).contains(&ty)`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.97.0/index.html#manual_range_contains
+
+warning: `explorer-rs` (build script) generated 9 warnings
+warning: explorer-rs@0.1.1: embedded icon D:\a\explorer-rs\explorer-rs\target\debug\build\explorer-rs-2069481f65fbea28\out\generated_icon.ico
+warning: this looks like an `else if` but the `else` is missing
+   --> src\app.rs:658:128
+    |
+658 | ...   resp.context_menu(|ui| { if ui.button("このタブを複製").clicked() { tab_action=Some((i,"dup")); ui.close_menu(); } if ui.butt...
+    |                                                                                                                         ^
+    |
+    = note: to remove this lint, add the missing `else` or add a new line before the second `if`
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.97.0/index.html#possible_missing_else
+    = note: `-W clippy::possible-missing-else` implied by `-W clippy::all`
+    = help: to override `-W clippy::all` add `#[allow(clippy::possible_missing_else)]`
+
+warning: this looks like an `else if` but the `else` is missing
+   --> src\app.rs:690:240
+    |
+690 | ...at!("⭐ {}", bm.name)).clicked() { nav=Some(bm.path.clone()); } if ui.small_button("×").clicked() { rm=Some(i); } }); }
+    |                                                                   ^
+    |
+    = note: to remove this lint, add the missing `else` or add a new line before the second `if`
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.97.0/index.html#possible_missing_else
+
+warning: this looks like an `else if` but the `else` is missing
+   --> src\app.rs:721:210
+    |
+721 | ...tal(|ui| { if ui.button("確定").clicked() { self.do_rename(); } if ui.button("取消").clicked() { self.renaming=false; } }); }); ...
+    |                                                                   ^
+    |
+    = note: to remove this lint, add the missing `else` or add a new line before the second `if`
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.97.0/index.html#possible_missing_else
+
+warning: this looks like an `else if` but the `else` is missing
+   --> src\app.rs:722:215
+    |
+722 | ...|ui| { if ui.button("作成").clicked() { self.do_new_folder(); } if ui.button("取消").clicked() { self.show_new_folder_dialog=fal...
+    |                                                                   ^
+    |
+    = note: to remove this lint, add the missing `else` or add a new line before the second `if`
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.97.0/index.html#possible_missing_else
+
+warning: this looks like an `else if` but the `else` is missing
+   --> src\app.rs:729:208
+    |
+729 | ...ed_text=s.clone()); self.status=format!("パスをコピー: {s}"); } if ui.small_button("Explorerで表示").clicked() { let _ = shell::...
+    |                                                                   ^
+    |
+    = note: to remove this lint, add the missing `else` or add a new line before the second `if`
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.97.0/index.html#possible_missing_else
+
+warning: this looks like an `else if` but the `else` is missing
+   --> src\app.rs:729:304
+    |
+729 | ...).clicked() { let _ = shell::reveal_in_explorer(&entry.path); } if ui.small_button("開く").clicked() { self.open_path(&entry.pat...
+    |                                                                   ^
+    |
+    = note: to remove this lint, add the missing `else` or add a new line before the second `if`
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.97.0/index.html#possible_missing_else
+
+warning: this looks like an `else if` but the `else` is missing
+   --> src\app.rs:773:604
+    |
+773 | ...dx)); } else { select_action=Some(SelectAction::Only(idx)); } } if resp.double_clicked() { select_action=Some(SelectAction::Only...
+    |                                                                   ^
+    |
+    = note: to remove this lint, add the missing `else` or add a new line before the second `if`
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.97.0/index.html#possible_missing_else
+
+warning: this looks like an `else if` but the `else` is missing
+   --> src\app.rs:773:786
+    |
+773 | ...one()); } else { let _=shell::open_with_shell(&entry.path); } } if resp.secondary_clicked() && !selected.contains(&idx) { select...
+    |                                                                   ^
+    |
+    = note: to remove this lint, add the missing `else` or add a new line before the second `if`
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.97.0/index.html#possible_missing_else
+
+warning: this looks like an `else if` but the `else` is missing
+   --> src\app.rs:773:1074
+    |
+773 | ...let _=shell::open_with_shell(&entry.path); } ui.close_menu(); } if ui.button("Explorerで表示").clicked() { let _ = shell::reveal...
+    |                                                                   ^
+    |
+    = note: to remove this lint, add the missing `else` or add a new line before the second `if`
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.97.0/index.html#possible_missing_else
+
+warning: this looks like an `else if` but the `else` is missing
+   --> src\app.rs:773:1181
+    |
+773 | ... _ = shell::reveal_in_explorer(&entry.path); ui.close_menu(); } if ui.button("パスをコピー").clicked() { ui.output_mut(|o| o.cop...
+    |                                                                   ^
+    |
+    = note: to remove this lint, add the missing `else` or add a new line before the second `if`
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.97.0/index.html#possible_missing_else
+
+warning: this looks like an `else if` but the `else` is missing
+   --> src\app.rs:773:1403
+    |
+773 | ...rl+C)").clicked() { cmd=Some(Command::Copy); ui.close_menu(); } if ui.button("切り取り (Ctrl+X)").clicked() { cmd=Some(Command::...
+    |                                                                   ^
+    |
+    = note: to remove this lint, add the missing `else` or add a new line before the second `if`
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.97.0/index.html#possible_missing_else
+
+warning: this looks like an `else if` but the `else` is missing
+   --> src\app.rs:773:1488
+    |
+773 | ...trl+X)").clicked() { cmd=Some(Command::Cut); ui.close_menu(); } if ui.button("貼り付け (Ctrl+V)").clicked() { cmd=Some(Command::...
+    |                                                                   ^
+    |
+    = note: to remove this lint, add the missing `else` or add a new line before the second `if`
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.97.0/index.html#possible_missing_else
+
+warning: this looks like an `else if` but the `else` is missing
+   --> src\app.rs:773:1675
+    |
+773 | ...2)").clicked() { cmd=Some(Command::Rename); ui.close_menu(); } if ui.button("ごみ箱へ (Del)").clicked() { cmd=Some(Command::Dele...
+    |                                                                  ^
+    |
+    = note: to remove this lint, add the missing `else` or add a new line before the second `if`
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.97.0/index.html#possible_missing_else
+
+warning: this looks like an `else if` but the `else` is missing
+   --> src\app.rs:773:1781
+    |
+773 | ...=Some(Command::Delete { permanent: false }); ui.close_menu(); } if ui.button("完全削除 (Shift+Del)").clicked() { cmd=Some(Comman...
+    |                                                                   ^
+    |
+    = note: to remove this lint, add the missing `else` or add a new line before the second `if`
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.97.0/index.html#possible_missing_else
+
+warning: this looks like an `else if` but the `else` is missing
+   --> src\app.rs:773:1993
+    |
+773 | ...).clicked() { cmd=Some(Command::NewFolder); ui.close_menu(); } if ui.button("全選択 (Ctrl+A)").clicked() { cmd=Some(Command::Sel...
+    |                                                                  ^
+    |
+    = note: to remove this lint, add the missing `else` or add a new line before the second `if`
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.97.0/index.html#possible_missing_else
+
+warning: this looks like you are trying to use `.. != ..`, but you really are doing `.. = (! ..)`
+   --> src\app.rs:775:98
+    |
+775 | ...   if let Some(s)=sort_clicked { let t=self.tab_for_mut(pane); if t.sort_by==s { t.sort_desc=!t.sort_desc; } else { t.sort_by=s;...
+    |                                                                                                ^^
+    |
+    = note: to remove this lint, use either `!=` or `= !`
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.97.0/index.html#suspicious_assignment_formatting
+    = note: `-W clippy::suspicious-assignment-formatting` implied by `-W clippy::all`
+    = help: to override `-W clippy::all` add `#[allow(clippy::suspicious_assignment_formatting)]`
+
+warning: this looks like an `else if` but the `else` is missing
+   --> src\app.rs:782:106
+    |
+782 | fn header_label(base: &str, active: bool, desc: bool) -> String { if !active { return base.to_string(); } if desc { format!("{base}...
+    |                                                                                                          ^
+    |
+    = note: to remove this lint, add the missing `else` or add a new line before the second `if`
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.97.0/index.html#possible_missing_else
+
+warning: this looks like an `else if` but the `else` is missing
+  --> src\main.rs:45:180
+   |
+45 | ...235)}; if y>=12&&y<=13&&x>=6&&x<26 { return (255,255,255,230); } if y>=16&&y<=17&&x>=6&&x<26 { return (255,255,255,230); } if y>=...
+   |                                                                    ^
+   |
+   = note: to remove this lint, add the missing `else` or add a new line before the second `if`
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.97.0/index.html#possible_missing_else
+
+warning: this looks like an `else if` but the `else` is missing
+  --> src\main.rs:45:238
+   |
+45 | ...30); } if y>=16&&y<=17&&x>=6&&x<26 { return (255,255,255,230); } if y>=20&&y<=21&&x>=6&&x<20 { return (255,255,255,230); } return...
+   |                                                                    ^
+   |
+   = note: to remove this lint, add the missing `else` or add a new line before the second `if`
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.97.0/index.html#possible_missing_else
+
+error[E0599]: no method named `ctx` found for struct `egui_extras::TableRow<'a, 'b>` in the current scope
+   --> src\app.rs:771:53
+    |
+771 |                 let tex = self.get_or_load_icon(row.ctx(), &entry.path, entry.is_dir);
+    |                                                     ^^^ method not found in `egui_extras::TableRow<'_, '_>`
+
+warning: variable does not need to be mutable
+   --> src\shell.rs:181:13
+    |
+181 |         let mut width = bm.bmWidth;
+    |             ----^^^^^
+    |             |
+    |             help: remove this `mut`
+    |
+    = note: `#[warn(unused_mut)]` (part of `#[warn(unused)]`) on by default
+
+For more information about this error, try `rustc --explain E0599`.
+warning: `explorer-rs` (bin "explorer-rs") generated 20 warnings
+warning: explorer-rs@0.1.1: embedded icon D:\a\explorer-rs\explorer-rs\target\debug\build\explorer-rs-2069481f65fbea28\out\generated_icon.ico
+error: could not compile `explorer-rs` (bin "explorer-rs") due to 1 previous error; 20 warnings emitted
+warning: build failed, waiting for other jobs to finish...
+warning: `explorer-rs` (bin "explorer-rs" test) generated 20 warnings (20 duplicates)
+warning: explorer-rs@0.1.1: embedded icon D:\a\explorer-rs\explorer-rs\target\debug\build\explorer-rs-2069481f65fbea28\out\generated_icon.ico
+error: could not compile `explorer-rs` (bin "explorer-rs" test) due to 1 previous error; 20 warnings emitted
