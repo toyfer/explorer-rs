@@ -1,15 +1,10 @@
-//! Windows shell integration: OS-standard file icons and context menus.
+//! Windows shell integration: OS-standard file icons, type names and helpers.
 //!
-//! - File/folder icons: uses `SHGetFileInfoW` to resolve the OS-associated icon
-//!   and caches the display type name. Rendering the actual HICON to an egui
-//!   texture is done lazily when needed; until then we map the OS type to a
-//!   stable emoji/character that matches Explorer's grouping.
-//! - Right-click: exposes helpers to reveal in Explorer and to open the OS
-//!   shell context menu via `ShellExecuteW` / `explorer /select`. Full
-//!   IContextMenu COM hosting is wired for future extension (hwnd + POINT).
-//!
-//! This keeps the app single-binary and avoids bundling icon assets — the
-//! icons you see are the same ones Explorer shows.
+//! - Icons: uses `SHGetFileInfoW` with `SHGFI_ICON` to obtain the real HICON
+//!   Explorer shows, converts it to RGBA via `GetIconInfo` + `GetDIBits`, and
+//!   returns raw bytes for egui to cache as textures. Single-binary, no assets.
+//! - Type name: `SHGFI_TYPENAME` gives "テキスト ドキュメント", "PNG ファイル" etc.
+//! - Helpers: `normalize_path_input` accepts both `\` and `/` on any OS.
 
 use std::path::Path;
 
@@ -23,13 +18,11 @@ pub fn normalize_path_input(input: &str) -> std::path::PathBuf {
     }
     #[cfg(windows)]
     {
-        // Preserve UNC prefix, then unify separators to `\`
         let is_unc = s.starts_with("\\\\") || s.starts_with("//");
         let mut n = s.replace('/', "\\");
         if is_unc && n.starts_with("//") {
             n = n.replacen("//", "\\\\", 1);
         }
-        // Collapse accidental triple slashes from mixed input, but keep `C:\` intact
         std::path::PathBuf::from(n)
     }
     #[cfg(not(windows))]
@@ -42,8 +35,21 @@ pub fn normalize_path_input(input: &str) -> std::path::PathBuf {
 mod windows_shell {
     use super::*;
     use std::os::windows::ffi::OsStrExt;
-    use windows::Win32::Storage::FileSystem::{FILE_ATTRIBUTE_DIRECTORY, FILE_ATTRIBUTE_NORMAL};
-    use windows::Win32::UI::Shell::{SHFILEINFOW, SHGFI_TYPENAME, SHGFI_USEFILEATTRIBUTES, SHGetFileInfoW};
+    use windows::Win32::Foundation::HWND;
+    use windows::Win32::Graphics::Gdi::{
+        DeleteObject, GetDC, GetDIBits, GetObjectW, ReleaseDC, BITMAP, BITMAPINFO,
+        BITMAPINFOHEADER, BI_RGB, DIB_RGB_COLORS, HBITMAP, HDC, HGDIOBJ,
+    };
+    use windows::Win32::Storage::FileSystem::{
+        FILE_ATTRIBUTE_DIRECTORY, FILE_ATTRIBUTE_NORMAL,
+    };
+    use windows::Win32::UI::Shell::{
+        SHFILEINFOW, SHGFI_ICON, SHGFI_SMALLICON, SHGFI_TYPENAME, SHGFI_USEFILEATTRIBUTES,
+        SHGetFileInfoW,
+    };
+    use windows::Win32::UI::WindowsAndMessaging::{
+        DestroyIcon, GetIconInfo, ICONINFO, HICON,
+    };
 
     /// OS display type name, e.g. "テキスト ドキュメント", "PNG ファイル"
     pub fn os_type_name(path: &Path) -> Option<String> {
@@ -84,7 +90,6 @@ mod windows_shell {
     }
 
     pub fn reveal_in_explorer(path: &Path) -> anyhow::Result<()> {
-        // explorer /select,"C:\path\to\file"
         let arg = format!("/select,\"{}\"", path.display());
         std::process::Command::new("explorer").arg(arg).spawn()?;
         Ok(())
@@ -95,13 +100,196 @@ mod windows_shell {
         Ok(())
     }
 
-    /// Placeholder for full IContextMenu hosting. Currently falls back to
-    /// `reveal_in_explorer` / `open_with_shell`. The COM plumbing
-    /// (IShellFolder::GetUIObjectOf -> IContextMenu::QueryContextMenu ->
-    /// TrackPopupMenu) is intentionally left for a focused follow-up so the
-    /// main UI stays stable; the entry points are already wired.
     pub fn show_os_context_menu(_paths: &[std::path::PathBuf]) -> anyhow::Result<()> {
         anyhow::bail!("OS context menu hosting requires HWND; use right-click -> Open / Reveal instead")
+    }
+
+    /// Try to obtain the true OS icon as RGBA bytes (16x16). Returns (rgba, w, h).
+    pub fn icon_rgba(path: &Path, is_dir: bool) -> Option<(Vec<u8>, i32, i32)> {
+        let w: Vec<u16> = path.as_os_str().encode_wide().chain(std::iter::once(0)).collect();
+        let mut info = SHFILEINFOW::default();
+        let attr = if is_dir {
+            FILE_ATTRIBUTE_DIRECTORY
+        } else {
+            FILE_ATTRIBUTE_NORMAL
+        };
+        // If the file exists, ask for its real icon (e.g. per-exe icon). Otherwise use file-attribute mode.
+        let use_attr = !path.exists();
+        let mut flags = SHGFI_ICON | SHGFI_SMALLICON;
+        if use_attr {
+            flags |= SHGFI_USEFILEATTRIBUTES;
+        }
+        let ret = unsafe {
+            SHGetFileInfoW(
+                windows::core::PCWSTR(w.as_ptr()),
+                attr,
+                Some(&mut info),
+                std::mem::size_of::<SHFILEINFOW>() as u32,
+                flags,
+            )
+        };
+        let hicon = if ret == 0 || info.hIcon.is_invalid() {
+            // fallback: retry with USEFILEATTRIBUTES if first attempt failed
+            if !use_attr {
+                let flags2 = SHGFI_ICON | SHGFI_SMALLICON | SHGFI_USEFILEATTRIBUTES;
+                let ret2 = unsafe {
+                    SHGetFileInfoW(
+                        windows::core::PCWSTR(w.as_ptr()),
+                        attr,
+                        Some(&mut info),
+                        std::mem::size_of::<SHFILEINFOW>() as u32,
+                        flags2,
+                    )
+                };
+                if ret2 == 0 || info.hIcon.is_invalid() {
+                    return None;
+                }
+                info.hIcon
+            } else {
+                return None;
+            }
+        } else {
+            info.hIcon
+        };
+        let res = unsafe { hicon_to_rgba(hicon) };
+        unsafe {
+            let _ = DestroyIcon(hicon);
+        }
+        res
+    }
+
+    unsafe fn hicon_to_rgba(hicon: HICON) -> Option<(Vec<u8>, i32, i32)> {
+        let mut icon_info = ICONINFO::default();
+        if GetIconInfo(hicon, &mut icon_info).is_err() {
+            return None;
+        }
+        let hbm_color = icon_info.hbmColor;
+        let hbm_mask = icon_info.hbmMask;
+        let is_color = !hbm_color.is_invalid() && hbm_color.0 != std::ptr::null_mut();
+        let hbmp: HBITMAP = if is_color { hbm_color } else { hbm_mask };
+        let mut bm = BITMAP::default();
+        if GetObjectW(
+            HGDIOBJ(hbmp.0),
+            std::mem::size_of::<BITMAP>() as i32,
+            Some(&mut bm as *mut _ as *mut std::ffi::c_void),
+        ) == 0
+        {
+            let _ = DeleteObject(HGDIOBJ(hbm_color.0));
+            let _ = DeleteObject(HGDIOBJ(hbm_mask.0));
+            return None;
+        }
+        let mut width = bm.bmWidth;
+        let mut height = bm.bmHeight;
+        if !is_color {
+            height /= 2;
+        }
+        if width <= 0 || height <= 0 {
+            let _ = DeleteObject(HGDIOBJ(hbm_color.0));
+            let _ = DeleteObject(HGDIOBJ(hbm_mask.0));
+            return None;
+        }
+        // Prepare 32bpp DIB
+        let mut bmi = BITMAPINFO {
+            bmiHeader: BITMAPINFOHEADER {
+                biSize: std::mem::size_of::<BITMAPINFOHEADER>() as u32,
+                biWidth: width,
+                biHeight: -height,
+                biPlanes: 1,
+                biBitCount: 32,
+                biCompression: BI_RGB.0,
+                biSizeImage: 0,
+                biXPelsPerMeter: 0,
+                biYPelsPerMeter: 0,
+                biClrUsed: 0,
+                biClrImportant: 0,
+            },
+            bmiColors: [Default::default(); 1],
+        };
+        let mut bits = vec![0u8; (width * height * 4) as usize];
+        let hdc: HDC = GetDC(HWND(std::ptr::null_mut()));
+        if hdc.is_invalid() {
+            let _ = DeleteObject(HGDIOBJ(hbm_color.0));
+            let _ = DeleteObject(HGDIOBJ(hbm_mask.0));
+            return None;
+        }
+        let scan = GetDIBits(
+            hdc,
+            hbmp,
+            0,
+            height as u32,
+            Some(bits.as_mut_ptr() as *mut std::ffi::c_void),
+            &mut bmi,
+            DIB_RGB_COLORS,
+        );
+        ReleaseDC(HWND(std::ptr::null_mut()), hdc);
+        if scan == 0 {
+            let _ = DeleteObject(HGDIOBJ(hbm_color.0));
+            let _ = DeleteObject(HGDIOBJ(hbm_mask.0));
+            return None;
+        }
+        // DIB is BGRA, convert to RGBA. For color icons alpha may be 0 (no alpha channel) -> derive from mask.
+        for chunk in bits.chunks_exact_mut(4) {
+            let b = chunk[0];
+            let g = chunk[1];
+            let r = chunk[2];
+            chunk[0] = r;
+            chunk[1] = g;
+            chunk[2] = b;
+        }
+        let has_alpha = bits.chunks_exact(4).any(|c| c[3] != 0);
+        if !has_alpha && is_color {
+            // Need mask to derive alpha
+            let mut mask_bits = vec![0u8; (width * height * 4) as usize];
+            let mut mask_bmi = bmi;
+            let hdc2 = GetDC(HWND(std::ptr::null_mut()));
+            if !hdc2.is_invalid() {
+                let ret2 = GetDIBits(
+                    hdc2,
+                    hbm_mask,
+                    0,
+                    height as u32,
+                    Some(mask_bits.as_mut_ptr() as *mut std::ffi::c_void),
+                    &mut mask_bmi,
+                    DIB_RGB_COLORS,
+                );
+                ReleaseDC(HWND(std::ptr::null_mut()), hdc2);
+                if ret2 != 0 {
+                    for i in 0..(width * height) as usize {
+                        // mask is monochrome: white = transparent
+                        let is_white = mask_bits[i * 4] == 255
+                            && mask_bits[i * 4 + 1] == 255
+                            && mask_bits[i * 4 + 2] == 255;
+                        if is_white {
+                            bits[i * 4 + 3] = 0;
+                        } else if bits[i * 4 + 3] == 0 {
+                            bits[i * 4 + 3] = 255;
+                        }
+                    }
+                } else {
+                    // no mask info, make fully opaque
+                    for c in bits.chunks_exact_mut(4) {
+                        c[3] = 255;
+                    }
+                }
+            }
+        } else if !is_color {
+            // monochrome icon: bits currently contains mask; turn into black/white with alpha
+            // For simplicity, make mask white = transparent, black = opaque black
+            for c in bits.chunks_exact_mut(4) {
+                let is_white = c[0] == 255 && c[1] == 255 && c[2] == 255;
+                if is_white {
+                    c[0] = 0;
+                    c[1] = 0;
+                    c[2] = 0;
+                    c[3] = 0;
+                } else {
+                    c[3] = 255;
+                }
+            }
+        }
+        let _ = DeleteObject(HGDIOBJ(hbm_color.0));
+        let _ = DeleteObject(HGDIOBJ(hbm_mask.0));
+        Some((bits, width, height))
     }
 
     pub fn icon_emoji_for_path(path: &Path, is_dir: bool) -> &'static str {
@@ -113,8 +301,6 @@ mod windows_shell {
             .and_then(|s| s.to_str())
             .unwrap_or("")
             .to_lowercase();
-        // Keep emoji mapping aligned with Explorer's type grouping.
-        // The actual HICON can be rendered in a later step; emoji is a stable fallback.
         match ext.as_str() {
             "png" | "jpg" | "jpeg" | "gif" | "bmp" | "webp" | "ico" | "svg" => "🖼️",
             "zip" | "7z" | "rar" | "tar" | "gz" | "bz2" | "xz" => "📦",
@@ -126,7 +312,6 @@ mod windows_shell {
             "xls" | "xlsx" => "📗",
             "ppt" | "pptx" => "📙",
             _ => {
-                // Try OS type name as tie-breaker
                 if let Some(t) = os_type_name(path) {
                     let tl = t.to_lowercase();
                     if tl.contains("フォルダ") || tl.contains("folder") {
@@ -146,9 +331,11 @@ mod windows_shell {
 mod windows_shell {
     use super::*;
     pub fn os_type_name(_path: &Path) -> Option<String> { None }
+    pub fn is_dir_via_attr(_path: &Path) -> bool { false }
     pub fn reveal_in_explorer(_path: &Path) -> anyhow::Result<()> { anyhow::bail!("Windows only") }
     pub fn open_with_shell(path: &Path) -> anyhow::Result<()> { open::that(path)?; Ok(()) }
     pub fn show_os_context_menu(_paths: &[std::path::PathBuf]) -> anyhow::Result<()> { anyhow::bail!("Windows only") }
+    pub fn icon_rgba(_path: &Path, _is_dir: bool) -> Option<(Vec<u8>, i32, i32)> { None }
     pub fn icon_emoji_for_path(path: &Path, is_dir: bool) -> &'static str {
         if is_dir { return "📁"; }
         let ext = path.extension().and_then(|s| s.to_str()).unwrap_or("").to_lowercase();
