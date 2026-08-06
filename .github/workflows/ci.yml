@@ -11,7 +11,7 @@ env:
 
 jobs:
   windows:
-    name: Windows build / test (fetchable logs)
+    name: Windows (stable + perf + fetchable logs)
     runs-on: windows-latest
     permissions:
       contents: write
@@ -28,8 +28,8 @@ jobs:
       - name: Cache cargo
         uses: Swatinem/rust-cache@v2
 
-      - name: Rust version
-        run: rustc --version && cargo --version && rustup show
+      - name: Versions
+        run: rustc -vV && cargo -vV
 
       - name: Cargo check
         id: check
@@ -37,9 +37,7 @@ jobs:
         shell: pwsh
         run: |
           cargo check --all-targets --verbose 2>&1 | Tee-Object -FilePath check.log
-          $code = $LASTEXITCODE
-          "check_exit=$code" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
-          Write-Host "check exit: $code"
+          "exit=$LASTEXITCODE" | Out-File check.exit.txt -Encoding utf8
           exit 0
 
       - name: Clippy
@@ -47,7 +45,7 @@ jobs:
         shell: pwsh
         run: |
           cargo clippy --all-targets -- -W clippy::all 2>&1 | Tee-Object -FilePath clippy.log
-          Write-Host "clippy exit: $LASTEXITCODE"
+          "exit=$LASTEXITCODE" | Out-File clippy.exit.txt -Encoding utf8
           exit 0
 
       - name: Tests
@@ -55,30 +53,28 @@ jobs:
         shell: pwsh
         run: |
           cargo test --all --verbose 2>&1 | Tee-Object -FilePath test.log
-          Write-Host "test exit: $LASTEXITCODE"
+          "exit=$LASTEXITCODE" | Out-File test.exit.txt -Encoding utf8
           exit 0
 
-      - name: Build release
+      - name: Build release (crt-static)
         continue-on-error: true
         shell: pwsh
         run: |
           $env:RUSTFLAGS = "-C target-feature=+crt-static"
           cargo build --release --verbose 2>&1 | Tee-Object -FilePath build.log
-          Write-Host "build exit: $LASTEXITCODE"
+          "exit=$LASTEXITCODE" | Out-File build.exit.txt -Encoding utf8
           exit 0
 
-      - name: Verify PE
+      - name: PE verify
         shell: pwsh
         run: |
           $bin = "target/release/explorer-rs.exe"
           if (Test-Path $bin) {
-            $b = [System.IO.File]::ReadAllBytes($bin)
-            $magic = "{0:X2} {1:X2}" -f $b[0], $b[1]
-            $size = [math]::Round($b.Length / 1MB, 2)
-            "PE=$magic size_mb=$size" | Tee-Object -FilePath pe.log
-            if ($b[0] -ne 0x4D -or $b[1] -ne 0x5A) { "NOT_PE" | Out-File pe.log -Append }
+            $b = [IO.File]::ReadAllBytes($bin)
+            $line = "PE_MAGIC={0:X2}{1:X2} SIZE_MB={2}" -f $b[0], $b[1], [math]::Round($b.Length/1MB,2)
+            $line | Tee-Object pe.log
           } else {
-            "MISSING" | Tee-Object -FilePath pe.log
+            "PE_MISSING" | Tee-Object pe.log
           }
 
       - name: Upload artifact
@@ -92,69 +88,51 @@ jobs:
             test.log
             build.log
             pe.log
+            *.exit.txt
           if-no-files-found: warn
           retention-days: 14
 
-      # Publish logs to ci-logs branch so agents can fetch via Contents API
       - name: Publish logs to ci-logs branch
         if: always()
         shell: pwsh
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          $ErrorActionPreference = "Continue"
           $sha7 = "${{ github.sha }}".Substring(0, 7)
-          $runId = "${{ github.run_id }}"
-          $dir = "logs/$sha7"
-          New-Item -ItemType Directory -Force -Path $dir | Out-Null
-          foreach ($f in @("check.log","clippy.log","test.log","build.log","pe.log")) {
-            if (Test-Path $f) { Copy-Item $f "$dir/" -Force }
+          $run = "${{ github.run_id }}"
+          $staging = Join-Path $env:RUNNER_TEMP "logstage"
+          New-Item -ItemType Directory -Force -Path $staging | Out-Null
+          foreach ($f in @("check.log","clippy.log","test.log","build.log","pe.log","check.exit.txt","clippy.exit.txt","test.exit.txt","build.exit.txt")) {
+            if (Test-Path $f) { Copy-Item $f $staging -Force }
           }
-          # tails for quick fetch
-          if (Test-Path check.log) {
-            Get-Content check.log -Tail 250 | Out-File "$dir/check.tail.txt" -Encoding utf8
-          }
-          if (Test-Path build.log) {
-            Get-Content build.log -Tail 250 | Out-File "$dir/build.tail.txt" -Encoding utf8
-          }
-          if (Test-Path clippy.log) {
-            Get-Content clippy.log -Tail 250 | Out-File "$dir/clippy.tail.txt" -Encoding utf8
-          }
-          if (Test-Path test.log) {
-            Get-Content test.log -Tail 150 | Out-File "$dir/test.tail.txt" -Encoding utf8
-          }
+          if (Test-Path check.log) { Get-Content check.log -Tail 300 | Set-Content (Join-Path $staging "check.tail.txt") -Encoding utf8 }
+          if (Test-Path build.log) { Get-Content build.log -Tail 300 | Set-Content (Join-Path $staging "build.tail.txt") -Encoding utf8 }
+          if (Test-Path clippy.log) { Get-Content clippy.log -Tail 200 | Set-Content (Join-Path $staging "clippy.tail.txt") -Encoding utf8 }
+          if (Test-Path test.log) { Get-Content test.log -Tail 150 | Set-Content (Join-Path $staging "test.tail.txt") -Encoding utf8 }
           @"
           sha=${{ github.sha }}
-          run_id=$runId
-          ref=${{ github.ref }}
-          actor=${{ github.actor }}
+          run_id=$run
           time=$(Get-Date -Format o)
-          "@ | Out-File "$dir/meta.txt" -Encoding utf8
+          "@ | Set-Content (Join-Path $staging "meta.txt") -Encoding utf8
 
-          git config user.name "ci-bot"
+          git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git fetch origin ci-logs --depth=1 2>$null
+          git fetch origin ci-logs --depth=1 2>&1 | Out-Host
           if ($LASTEXITCODE -eq 0) {
             git checkout ci-logs
           } else {
             git checkout --orphan ci-logs
             git rm -rf . 2>$null | Out-Null
           }
-          New-Item -ItemType Directory -Force -Path "logs/$sha7" | Out-Null
-          Copy-Item -Recurse -Force $dir/* "logs/$sha7/" -ErrorAction SilentlyContinue
-          # restore from workspace if checkout wiped
-          if (-not (Test-Path "logs/$sha7/meta.txt")) {
-            New-Item -ItemType Directory -Force -Path "logs/$sha7" | Out-Null
-            foreach ($f in @("check.log","clippy.log","test.log","build.log","pe.log")) {
-              if (Test-Path $f) { Copy-Item $f "logs/$sha7/" }
-            }
-          }
-          git add "logs/$sha7"
+          $dest = "logs/$sha7"
+          New-Item -ItemType Directory -Force -Path $dest | Out-Null
+          Copy-Item (Join-Path $staging "*") $dest -Force
+          git add $dest
           git status
-          git commit -m "ci logs $sha7 run $runId" 2>&1 | Out-Host
+          git commit -m "ci logs $sha7 run $run" 2>&1 | Out-Host
           if ($LASTEXITCODE -eq 0) {
             git push origin HEAD:ci-logs --force 2>&1 | Out-Host
-            Write-Host "Published https://github.com/${{ github.repository }}/tree/ci-logs/logs/$sha7"
+            Write-Host "Logs: https://github.com/${{ github.repository }}/tree/ci-logs/logs/$sha7"
           } else {
-            Write-Host "Nothing to commit or commit failed"
+            Write-Host "No commit (empty?)"
           }
