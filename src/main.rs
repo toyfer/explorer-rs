@@ -6,6 +6,7 @@ mod config;
 mod fonts;
 mod fs_ops;
 mod tab;
+mod watch;
 
 use app::ExplorerApp;
 use eframe::egui;
@@ -16,7 +17,6 @@ fn main() -> eframe::Result {
         .with_inner_size([1280.0, 780.0])
         .with_min_inner_size([900.0, 600.0])
         .with_title("explorer-rs — Explorer++ inspired")
-        // Required on Windows; always enabled on other platforms.
         .with_drag_and_drop(true);
 
     #[cfg(windows)]
@@ -41,16 +41,12 @@ fn main() -> eframe::Result {
         native_options,
         Box::new(move |cc| {
             egui_extras::install_image_loaders(&cc.egui_ctx);
-
-            // Japanese / CJK fonts + size (must run before first frame)
             let font_status = fonts::apply_fonts(&cc.egui_ctx, &config);
-
             if config.theme_dark {
                 cc.egui_ctx.set_visuals(egui::Visuals::dark());
             } else {
                 cc.egui_ctx.set_visuals(egui::Visuals::light());
             }
-
             let mut app = ExplorerApp::new(start_path, config, cc);
             app.status = format!("準備完了 — {font_status}");
             Ok(Box::new(app))
