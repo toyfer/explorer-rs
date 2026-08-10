@@ -1,6 +1,6 @@
 //! Windows CI performance bench. Writes bench-summary.json when EXPLORER_RS_BENCH_JSON=1.
 
-use std::cmp::Ordering;
+use std::cmp::Ordering::{self, Equal, Greater, Less};
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::time::Instant;
@@ -38,9 +38,9 @@ fn natural_cmp(a: &str, b: &str) -> Ordering {
     let mut bc = b.chars().peekable();
     loop {
         match (ac.peek().copied(), bc.peek().copied()) {
-            (None, None) => return Ordering::Equal,
-            (None, Some(_)) => return Ordering::Less,
-            (Some(_), None) => return Ordering::Greater,
+            (None, None) => return Equal,
+            (None, Some(_)) => return Less,
+            (Some(_), None) => return Greater,
             (Some(ca), Some(cb)) => {
                 if ca.is_ascii_digit() && cb.is_ascii_digit() {
                     let mut na = 0u64;
@@ -62,14 +62,14 @@ fn natural_cmp(a: &str, b: &str) -> Ordering {
                         }
                     }
                     match na.cmp(&nb) {
-                        Ordering::Equal => continue,
+                        Equal => continue,
                         o => return o,
                     }
                 } else {
                     let ca = ac.next().unwrap().to_ascii_lowercase();
                     let cb = bc.next().unwrap().to_ascii_lowercase();
                     match ca.cmp(&cb) {
-                        Ordering::Equal => continue,
+                        Equal => continue,
                         o => return o,
                     }
                 }
