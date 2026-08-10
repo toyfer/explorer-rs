@@ -20,6 +20,14 @@ impl Clipboard {
 
 /// Sanitize a user-supplied rename target: reject path separators, `..`, and Windows reserved names.
 pub fn sanitize_filename(name: &str) -> Option<String> {
+    // Validate raw input before trim so leading tabs / trailing spaces are not silently accepted.
+    if name.ends_with(' ')
+        || name.chars().any(|c| {
+            matches!(c, '<' | '>' | ':' | '"' | '|' | '?' | '*') || c.is_control()
+        })
+    {
+        return None;
+    }
     let name = name.trim();
     if name.is_empty() || name == "." || name == ".." {
         return None;
@@ -27,34 +35,56 @@ pub fn sanitize_filename(name: &str) -> Option<String> {
     if name.contains('/') || name.contains('\\') || name.contains('\0') {
         return None;
     }
-    // Control characters and Windows-illegal chars
-    if name.chars().any(|c| matches!(c, '<' | '>' | ':' | '"' | '|' | '?' | '*') || c.is_control()) {
-        return None;
-    }
     if Path::new(name).components().count() != 1 {
         return None;
     }
-    // Windows reserved device names (CON, PRN, AUX, NUL, COM1.., LPT1..)
+    // Windows reserved device names (CON, PRN, AUX, NUL, COM1.., LPT1.., plus superscript variants)
     let stem = name
         .split('.')
         .next()
         .unwrap_or(name)
         .to_ascii_uppercase();
     const RESERVED: &[&str] = &[
-        "CON", "PRN", "AUX", "NUL", "COM1", "COM2", "COM3", "COM4", "COM5", "COM6", "COM7",
-        "COM8", "COM9", "LPT1", "LPT2", "LPT3", "LPT4", "LPT5", "LPT6", "LPT7", "LPT8", "LPT9",
+        "CON",
+        "PRN",
+        "AUX",
+        "NUL",
+        "COM1",
+        "COM2",
+        "COM3",
+        "COM4",
+        "COM5",
+        "COM6",
+        "COM7",
+        "COM8",
+        "COM9",
+        "COM\u{00B9}",
+        "COM\u{00B2}",
+        "COM\u{00B3}",
+        "LPT1",
+        "LPT2",
+        "LPT3",
+        "LPT4",
+        "LPT5",
+        "LPT6",
+        "LPT7",
+        "LPT8",
+        "LPT9",
+        "LPT\u{00B9}",
+        "LPT\u{00B2}",
+        "LPT\u{00B3}",
     ];
     if RESERVED.contains(&stem.as_str()) {
         return None;
     }
-    // Trailing dots/spaces are invalid on Windows
-    if name.ends_with('.') || name.ends_with(' ') {
+    // Trailing dots are invalid on Windows
+    if name.ends_with('.') {
         return None;
     }
     Some(name.to_string())
 }
 
-/// Normalize user input so both `\` and `/` are accepted as separators.
+/// Normalize user input so both `\\` and `/` are accepted as separators.
 pub fn normalize_path_input(input: &str) -> PathBuf {
     crate::shell::normalize_path_input(input)
 }
@@ -254,6 +284,10 @@ mod tests {
         assert!(sanitize_filename("nul").is_none());
         assert!(sanitize_filename("bad:name").is_none());
         assert!(sanitize_filename("trailing.").is_none());
+        assert!(sanitize_filename("\tfoo").is_none());
+        assert!(sanitize_filename("foo ").is_none());
+        assert!(sanitize_filename("COM\u{00B9}.txt").is_none());
+        assert!(sanitize_filename("LPT\u{00B3}").is_none());
     }
 
     #[test]
