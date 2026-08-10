@@ -1,9 +1,7 @@
 //! Natural (human) sort: "file2" < "file10".
-//! Used for Name column so power users get Explorer-like ordering.
 
 use std::cmp::Ordering;
 
-/// Compare two strings with numeric awareness (Unicode scalars).
 pub fn natural_cmp(a: &str, b: &str) -> Ordering {
     let mut ac = a.chars().peekable();
     let mut bc = b.chars().peekable();
