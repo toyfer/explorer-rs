@@ -18,7 +18,7 @@ impl Clipboard {
     }
 }
 
-/// Sanitize a user-supplied rename target: reject path separators and `..`.
+/// Sanitize a user-supplied rename target: reject path separators, `..`, and Windows reserved names.
 pub fn sanitize_filename(name: &str) -> Option<String> {
     let name = name.trim();
     if name.is_empty() || name == "." || name == ".." {
@@ -27,14 +27,34 @@ pub fn sanitize_filename(name: &str) -> Option<String> {
     if name.contains('/') || name.contains('\\') || name.contains('\0') {
         return None;
     }
+    // Control characters and Windows-illegal chars
+    if name.chars().any(|c| matches!(c, '<' | '>' | ':' | '"' | '|' | '?' | '*') || c.is_control()) {
+        return None;
+    }
     if Path::new(name).components().count() != 1 {
+        return None;
+    }
+    // Windows reserved device names (CON, PRN, AUX, NUL, COM1.., LPT1..)
+    let stem = name
+        .split('.')
+        .next()
+        .unwrap_or(name)
+        .to_ascii_uppercase();
+    const RESERVED: &[&str] = &[
+        "CON", "PRN", "AUX", "NUL", "COM1", "COM2", "COM3", "COM4", "COM5", "COM6", "COM7",
+        "COM8", "COM9", "LPT1", "LPT2", "LPT3", "LPT4", "LPT5", "LPT6", "LPT7", "LPT8", "LPT9",
+    ];
+    if RESERVED.contains(&stem.as_str()) {
+        return None;
+    }
+    // Trailing dots/spaces are invalid on Windows
+    if name.ends_with('.') || name.ends_with(' ') {
         return None;
     }
     Some(name.to_string())
 }
 
 /// Normalize user input so both `\` and `/` are accepted as separators.
-/// Delegates to `crate::shell::normalize_path_input` for OS-specific rules.
 pub fn normalize_path_input(input: &str) -> PathBuf {
     crate::shell::normalize_path_input(input)
 }
@@ -114,6 +134,18 @@ pub fn humansize(n: u64) -> String {
     } else {
         format!("{v:.1} {}", U[i])
     }
+}
+
+/// Sum sizes of selected file entries (directories count as 0).
+pub fn selected_total_size<'a, I>(entries: I) -> u64
+where
+    I: IntoIterator<Item = &'a crate::tab::FileEntry>,
+{
+    entries
+        .into_iter()
+        .filter(|e| !e.is_dir)
+        .map(|e| e.size)
+        .sum()
 }
 
 pub fn fmt_time(t: Option<std::time::SystemTime>) -> String {
@@ -217,6 +249,11 @@ mod tests {
         assert!(sanitize_filename("..").is_none());
         assert!(sanitize_filename("").is_none());
         assert!(sanitize_filename("  ").is_none());
+        assert!(sanitize_filename("CON").is_none());
+        assert!(sanitize_filename("con.txt").is_none());
+        assert!(sanitize_filename("nul").is_none());
+        assert!(sanitize_filename("bad:name").is_none());
+        assert!(sanitize_filename("trailing.").is_none());
     }
 
     #[test]
@@ -231,7 +268,6 @@ mod tests {
     fn normalize_accepts_both_separators() {
         let p1 = normalize_path_input("C:/Users/foo/bar");
         let p2 = normalize_path_input("C:\\Users\\foo\\bar");
-        // On Windows both become same; on Unix they differ but at least don't panic
         assert!(!p1.as_os_str().is_empty());
         assert!(!p2.as_os_str().is_empty());
         let mixed = normalize_path_input("C:\\Users/foo\\bar/baz");
