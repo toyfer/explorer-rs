@@ -103,7 +103,11 @@ impl Tab {
     }
 
     /// Blocking directory scan used by background workers.
-    pub fn list_blocking(dir: &Path, show_hidden: bool, filter: &str) -> (Vec<FileEntry>, Option<String>) {
+    pub fn list_blocking(
+        dir: &Path,
+        show_hidden: bool,
+        filter: &str,
+    ) -> (Vec<FileEntry>, Option<String>) {
         let mut entries = Vec::new();
         let mut error = None;
         match std::fs::read_dir(dir) {
@@ -115,7 +119,8 @@ impl Tab {
                         if !show_hidden && entry.is_hidden {
                             continue;
                         }
-                        if !filter_lc.is_empty() && !entry.name.to_lowercase().contains(&filter_lc) {
+                        if !filter_lc.is_empty() && !entry.name.to_lowercase().contains(&filter_lc)
+                        {
                             continue;
                         }
                         entries.push(entry);
@@ -131,28 +136,57 @@ impl Tab {
     pub fn sort_entries(entries: &mut Vec<FileEntry>, sort_by: SortBy, sort_desc: bool) {
         match sort_by {
             SortBy::Name => entries.sort_by(|a, b| {
-                let ord = b.is_dir.cmp(&a.is_dir).then(a.name.to_lowercase().cmp(&b.name.to_lowercase()));
-                if sort_desc { ord.reverse() } else { ord }
+                let ord = b
+                    .is_dir
+                    .cmp(&a.is_dir)
+                    .then(a.name.to_lowercase().cmp(&b.name.to_lowercase()));
+                if sort_desc {
+                    ord.reverse()
+                } else {
+                    ord
+                }
             }),
             SortBy::Size => entries.sort_by(|a, b| {
                 let ord = b.is_dir.cmp(&a.is_dir).then(a.size.cmp(&b.size));
-                if sort_desc { ord.reverse() } else { ord }
+                if sort_desc {
+                    ord.reverse()
+                } else {
+                    ord
+                }
             }),
             SortBy::Modified => entries.sort_by(|a, b| {
                 let ord = b.is_dir.cmp(&a.is_dir).then(a.modified.cmp(&b.modified));
-                if sort_desc { ord.reverse() } else { ord }
+                if sort_desc {
+                    ord.reverse()
+                } else {
+                    ord
+                }
             }),
             SortBy::Type => entries.sort_by(|a, b| {
-                let ord = b.is_dir.cmp(&a.is_dir).then(a.ext.cmp(&b.ext)).then(a.name.to_lowercase().cmp(&b.name.to_lowercase()));
-                if sort_desc { ord.reverse() } else { ord }
+                let ord = b
+                    .is_dir
+                    .cmp(&a.is_dir)
+                    .then(a.ext.cmp(&b.ext))
+                    .then(a.name.to_lowercase().cmp(&b.name.to_lowercase()));
+                if sort_desc {
+                    ord.reverse()
+                } else {
+                    ord
+                }
             }),
         }
     }
 
     /// Apply a background list result, preserving selection by path.
     pub fn apply_list(&mut self, entries: Vec<FileEntry>, error: Option<String>) {
-        let selected_paths: Vec<PathBuf> = self.selected.iter().filter_map(|&i| self.entries.get(i).map(|e| e.path.clone())).collect();
-        let focus_path = self.focus.and_then(|i| self.entries.get(i).map(|e| e.path.clone()));
+        let selected_paths: Vec<PathBuf> = self
+            .selected
+            .iter()
+            .filter_map(|&i| self.entries.get(i).map(|e| e.path.clone()))
+            .collect();
+        let focus_path = self
+            .focus
+            .and_then(|i| self.entries.get(i).map(|e| e.path.clone()));
         self.entries = entries;
         self.error = error;
         self.selected.clear();
@@ -166,11 +200,17 @@ impl Tab {
     }
 
     pub fn refresh(&mut self) {
-        let (mut entries, error) = Self::list_blocking(&self.current, self.show_hidden, &self.filter);
+        let (mut entries, error) =
+            Self::list_blocking(&self.current, self.show_hidden, &self.filter);
         Self::sort_entries(&mut entries, self.sort_by, self.sort_desc);
-        // preserve selection for synchronous path as well
-        let selected_paths: Vec<PathBuf> = self.selected.iter().filter_map(|&i| self.entries.get(i).map(|e| e.path.clone())).collect();
-        let focus_path = self.focus.and_then(|i| self.entries.get(i).map(|e| e.path.clone()));
+        let selected_paths: Vec<PathBuf> = self
+            .selected
+            .iter()
+            .filter_map(|&i| self.entries.get(i).map(|e| e.path.clone()))
+            .collect();
+        let focus_path = self
+            .focus
+            .and_then(|i| self.entries.get(i).map(|e| e.path.clone()));
         self.entries = entries;
         self.error = error;
         self.selected.clear();
@@ -189,8 +229,14 @@ impl Tab {
     }
 
     pub fn sort(&mut self) {
-        let selected_paths: Vec<PathBuf> = self.selected.iter().filter_map(|&i| self.entries.get(i).map(|e| e.path.clone())).collect();
-        let focus_path = self.focus.and_then(|i| self.entries.get(i).map(|e| e.path.clone()));
+        let selected_paths: Vec<PathBuf> = self
+            .selected
+            .iter()
+            .filter_map(|&i| self.entries.get(i).map(|e| e.path.clone()))
+            .collect();
+        let focus_path = self
+            .focus
+            .and_then(|i| self.entries.get(i).map(|e| e.path.clone()));
         Self::sort_entries(&mut self.entries, self.sort_by, self.sort_desc);
         self.selected.clear();
         for (i, e) in self.entries.iter().enumerate() {
@@ -210,6 +256,9 @@ impl Tab {
             self.history_back.push(self.current.clone());
             self.history_forward.clear();
             self.current = path;
+            self.selected.clear();
+            self.focus = None;
+            self.anchor = None;
             self.refresh();
         }
     }
@@ -218,6 +267,9 @@ impl Tab {
         if let Some(prev) = self.history_back.pop() {
             self.history_forward.push(self.current.clone());
             self.current = prev;
+            self.selected.clear();
+            self.focus = None;
+            self.anchor = None;
             self.refresh();
             true
         } else {
@@ -229,6 +281,9 @@ impl Tab {
         if let Some(next) = self.history_forward.pop() {
             self.history_back.push(self.current.clone());
             self.current = next;
+            self.selected.clear();
+            self.focus = None;
+            self.anchor = None;
             self.refresh();
             true
         } else {
@@ -247,11 +302,21 @@ impl Tab {
     }
 
     pub fn primary_selected(&self) -> Option<&FileEntry> {
-        self.focus.and_then(|i| self.entries.get(i)).or_else(|| self.selected.iter().next().and_then(|&i| self.entries.get(i)))
+        self.focus
+            .and_then(|i| self.entries.get(i))
+            .or_else(|| {
+                self.selected
+                    .iter()
+                    .next()
+                    .and_then(|&i| self.entries.get(i))
+            })
     }
 
     pub fn selected_paths(&self) -> Vec<PathBuf> {
-        self.selected.iter().filter_map(|&i| self.entries.get(i).map(|e| e.path.clone())).collect()
+        self.selected
+            .iter()
+            .filter_map(|&i| self.entries.get(i).map(|e| e.path.clone()))
+            .collect()
     }
 
     pub fn select_only(&mut self, idx: usize) {
@@ -281,7 +346,11 @@ impl Tab {
             return;
         }
         let anchor = self.anchor.unwrap_or(idx);
-        let (a, b) = if anchor <= idx { (anchor, idx) } else { (idx, anchor) };
+        let (a, b) = if anchor <= idx {
+            (anchor, idx)
+        } else {
+            (idx, anchor)
+        };
         self.selected.clear();
         for i in a..=b {
             self.selected.insert(i);
@@ -297,10 +366,91 @@ impl Tab {
         }
     }
 
+    /// Invert selection (Ctrl+I style).
+    pub fn invert_selection(&mut self) {
+        let all: BTreeSet<usize> = (0..self.entries.len()).collect();
+        self.selected = all.difference(&self.selected).copied().collect();
+        self.focus = self.selected.iter().next().copied().or(self.focus);
+    }
+
     pub fn clear_selection(&mut self) {
         self.selected.clear();
         self.focus = None;
         self.anchor = None;
+    }
+
+    /// Move focus by delta (Arrow / Page keys). Shift extends range from anchor.
+    pub fn move_focus_by(&mut self, delta: isize, extend: bool) {
+        let len = self.entries.len();
+        if len == 0 {
+            return;
+        }
+        let cur = self.focus.unwrap_or(0) as isize;
+        let nxt = (cur + delta).clamp(0, (len - 1) as isize) as usize;
+        if extend {
+            if self.anchor.is_none() {
+                self.anchor = self.focus.or(Some(cur.max(0) as usize));
+            }
+            self.focus = Some(nxt);
+            let anchor = self.anchor.unwrap_or(nxt);
+            let (a, b) = if anchor <= nxt {
+                (anchor, nxt)
+            } else {
+                (nxt, anchor)
+            };
+            self.selected.clear();
+            for i in a..=b {
+                self.selected.insert(i);
+            }
+        } else {
+            self.select_only(nxt);
+        }
+    }
+
+    pub fn focus_first(&mut self, extend: bool) {
+        if self.entries.is_empty() {
+            return;
+        }
+        if extend {
+            if self.anchor.is_none() {
+                self.anchor = self.focus.or(Some(0));
+            }
+            self.focus = Some(0);
+            let anchor = self.anchor.unwrap_or(0);
+            let (a, b) = if anchor <= 0 { (0, anchor) } else { (0, anchor) };
+            self.selected.clear();
+            for i in a.min(b)..=a.max(b) {
+                self.selected.insert(i);
+            }
+        } else {
+            self.select_only(0);
+        }
+    }
+
+    pub fn focus_last(&mut self, extend: bool) {
+        let len = self.entries.len();
+        if len == 0 {
+            return;
+        }
+        let last = len - 1;
+        if extend {
+            if self.anchor.is_none() {
+                self.anchor = self.focus.or(Some(last));
+            }
+            self.focus = Some(last);
+            let anchor = self.anchor.unwrap_or(last);
+            let (a, b) = if anchor <= last {
+                (anchor, last)
+            } else {
+                (last, anchor)
+            };
+            self.selected.clear();
+            for i in a..=b {
+                self.selected.insert(i);
+            }
+        } else {
+            self.select_only(last);
+        }
     }
 
     pub fn enter_primary(&mut self) -> Option<PathBuf> {
@@ -320,7 +470,12 @@ impl Tab {
         }
         let q = query.to_lowercase();
         let mut results = Vec::new();
-        for entry in WalkDir::new(root).max_depth(6).follow_links(false).into_iter().filter_map(|e| e.ok()) {
+        for entry in WalkDir::new(root)
+            .max_depth(8)
+            .follow_links(false)
+            .into_iter()
+            .filter_map(|e| e.ok())
+        {
             if results.len() >= max_results {
                 break;
             }
@@ -344,7 +499,13 @@ mod tests {
     use std::fs;
     #[test]
     fn sort_dirs_first() {
-        let dir = std::env::temp_dir().join(format!("explorer-rs-tab-{}", std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_nanos()));
+        let dir = std::env::temp_dir().join(format!(
+            "explorer-rs-tab-{}",
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
         fs::create_dir_all(dir.join("sub")).unwrap();
         fs::write(dir.join("a.txt"), b"x").unwrap();
         fs::write(dir.join("z.txt"), b"y").unwrap();
@@ -355,7 +516,13 @@ mod tests {
     }
     #[test]
     fn multi_select_range() {
-        let dir = std::env::temp_dir().join(format!("explorer-rs-sel-{}", std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_nanos()));
+        let dir = std::env::temp_dir().join(format!(
+            "explorer-rs-sel-{}",
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
         fs::create_dir_all(&dir).unwrap();
         for i in 0..5 {
             fs::write(dir.join(format!("f{i}.txt")), b"x").unwrap();
@@ -366,11 +533,19 @@ mod tests {
         assert_eq!(tab.selected.len(), 3);
         tab.select_all();
         assert_eq!(tab.selected.len(), tab.entries.len());
+        tab.invert_selection();
+        assert!(tab.selected.is_empty());
         let _ = fs::remove_dir_all(dir);
     }
     #[test]
     fn list_blocking_filters_hidden() {
-        let dir = std::env::temp_dir().join(format!("explorer-rs-hidden-{}", std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_nanos()));
+        let dir = std::env::temp_dir().join(format!(
+            "explorer-rs-hidden-{}",
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
         fs::create_dir_all(&dir).unwrap();
         fs::write(dir.join(".hidden"), b"x").unwrap();
         fs::write(dir.join("visible.txt"), b"x").unwrap();
@@ -379,6 +554,27 @@ mod tests {
         assert_eq!(entries[0].name, "visible.txt");
         let (entries2, _) = Tab::list_blocking(&dir, true, "");
         assert_eq!(entries2.len(), 2);
+        let _ = fs::remove_dir_all(dir);
+    }
+    #[test]
+    fn move_focus_by_clamps() {
+        let dir = std::env::temp_dir().join(format!(
+            "explorer-rs-focus-{}",
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        fs::create_dir_all(&dir).unwrap();
+        for i in 0..3 {
+            fs::write(dir.join(format!("f{i}.txt")), b"x").unwrap();
+        }
+        let mut tab = Tab::new(dir.clone(), true, SortBy::Name, false);
+        tab.select_only(0);
+        tab.move_focus_by(10, false);
+        assert_eq!(tab.focus, Some(2));
+        tab.move_focus_by(-100, false);
+        assert_eq!(tab.focus, Some(0));
         let _ = fs::remove_dir_all(dir);
     }
 }

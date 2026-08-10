@@ -16,15 +16,25 @@ pub enum Command {
     NewFolder,
     NewTextFile,
     SelectAll,
+    InvertSelection,
     Refresh,
     GoUp,
     GoBack,
     GoForward,
+    GoHome,
     OpenPrimary,
     AddBookmark,
     Search,
+    CopyPath,
+    CopyName,
+    ToggleHidden,
+    TogglePreview,
+    ToggleDualPane,
     ConfirmDelete { permanent: bool },
     CancelDialog,
+    FocusAddress,
+    FocusSearch,
+    FocusFilter,
 }
 
 /// Results delivered from background workers back to the UI thread.
@@ -33,7 +43,12 @@ pub enum BgEvent {
     SearchDone { query: String, results: Vec<FileEntry> },
     PasteDone { ok: usize, err: usize, message: String },
     FsChanged,
-    ListDone { generation: u64, is_pane2: bool, entries: Vec<FileEntry>, error: Option<String> },
+    ListDone {
+        generation: u64,
+        is_pane2: bool,
+        entries: Vec<FileEntry>,
+        error: Option<String>,
+    },
 }
 
 pub type BgSender = mpsc::Sender<BgEvent>;
@@ -45,7 +60,7 @@ pub fn channel() -> (BgSender, BgReceiver) {
 
 pub fn spawn_search(tx: BgSender, root: PathBuf, query: String) {
     thread::spawn(move || {
-        let results = crate::tab::Tab::search_blocking(&root, &query, 300);
+        let results = crate::tab::Tab::search_blocking(&root, &query, 500);
         let _ = tx.send(BgEvent::SearchDone { query, results });
     });
 }
@@ -78,10 +93,24 @@ pub fn spawn_paste(tx: BgSender, paths: Vec<PathBuf>, mode: ClipboardMode, dest_
     });
 }
 
-pub fn spawn_list(tx: BgSender, generation: u64, is_pane2: bool, dir: PathBuf, show_hidden: bool, filter: String, sort_by: crate::config::SortBy, sort_desc: bool) {
+pub fn spawn_list(
+    tx: BgSender,
+    generation: u64,
+    is_pane2: bool,
+    dir: PathBuf,
+    show_hidden: bool,
+    filter: String,
+    sort_by: crate::config::SortBy,
+    sort_desc: bool,
+) {
     thread::spawn(move || {
         let (mut entries, error) = crate::tab::Tab::list_blocking(&dir, show_hidden, &filter);
         crate::tab::Tab::sort_entries(&mut entries, sort_by, sort_desc);
-        let _ = tx.send(BgEvent::ListDone { generation, is_pane2, entries, error });
+        let _ = tx.send(BgEvent::ListDone {
+            generation,
+            is_pane2,
+            entries,
+            error,
+        });
     });
 }
