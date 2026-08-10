@@ -100,8 +100,10 @@ impl AppConfig {
                     if c.row_height_scale < 0.8 || c.row_height_scale > 1.5 {
                         c.row_height_scale = 1.0;
                     }
-                    // Drop missing recent paths
-                    c.recent_paths.retain(|p| p.exists());
+                    // Keep existing directories only, preserving most-recent order.
+                    let mut seen = std::collections::HashSet::new();
+                    c.recent_paths
+                        .retain(|p| p.is_dir() && seen.insert(p.clone()));
                     c.recent_paths.truncate(MAX_RECENT);
                     return c;
                 }
