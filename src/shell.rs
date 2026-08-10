@@ -100,10 +100,12 @@ mod windows_shell {
     }
 
     pub fn reveal_in_explorer(path: &Path) -> anyhow::Result<()> {
-        // Prefer /select,\"path\" form; fall back to opening parent if needed
+        // explorer /select,"C:\path\to\file" — pass as two args to avoid shell parsing issues
         let path_str = path.display().to_string();
-        let arg = format!("/select,{path_str}");
-        std::process::Command::new("explorer").raw_arg(arg).spawn()?;
+        let select_arg = format!("/select,{path_str}");
+        std::process::Command::new("explorer")
+            .arg(select_arg)
+            .spawn()?;
         Ok(())
     }
 
@@ -131,7 +133,6 @@ mod windows_shell {
         } else {
             FILE_ATTRIBUTE_NORMAL
         };
-        // If the file exists, ask for its real icon (e.g. per-exe icon). Otherwise use file-attribute mode.
         let use_attr = !path.exists();
         let mut flags = SHGFI_ICON | SHGFI_SMALLICON;
         if use_attr {
@@ -147,7 +148,6 @@ mod windows_shell {
             )
         };
         let hicon = if ret == 0 || info.hIcon.is_invalid() {
-            // fallback: retry with USEFILEATTRIBUTES if first attempt failed
             if !use_attr {
                 let flags2 = SHGFI_ICON | SHGFI_SMALLICON | SHGFI_USEFILEATTRIBUTES;
                 let ret2 = unsafe {
@@ -206,7 +206,6 @@ mod windows_shell {
             let _ = DeleteObject(HGDIOBJ(hbm_mask.0));
             return None;
         }
-        // Prepare 32bpp DIB
         let mut bmi = BITMAPINFO {
             bmiHeader: BITMAPINFOHEADER {
                 biSize: std::mem::size_of::<BITMAPINFOHEADER>() as u32,
@@ -245,7 +244,6 @@ mod windows_shell {
             let _ = DeleteObject(HGDIOBJ(hbm_mask.0));
             return None;
         }
-        // DIB is BGRA, convert to RGBA. For color icons alpha may be 0 (no alpha channel) -> derive from mask.
         for chunk in bits.chunks_exact_mut(4) {
             let b = chunk[0];
             let g = chunk[1];
@@ -256,7 +254,6 @@ mod windows_shell {
         }
         let has_alpha = bits.chunks_exact(4).any(|c| c[3] != 0);
         if !has_alpha && is_color {
-            // Need mask to derive alpha
             let mut mask_bits = vec![0u8; (width * height * 4) as usize];
             let mut mask_bmi = bmi;
             let hdc2 = GetDC(HWND(std::ptr::null_mut()));
@@ -273,7 +270,6 @@ mod windows_shell {
                 ReleaseDC(HWND(std::ptr::null_mut()), hdc2);
                 if ret2 != 0 {
                     for i in 0..(width * height) as usize {
-                        // mask is monochrome: white = transparent
                         let is_white = mask_bits[i * 4] == 255
                             && mask_bits[i * 4 + 1] == 255
                             && mask_bits[i * 4 + 2] == 255;
@@ -284,14 +280,12 @@ mod windows_shell {
                         }
                     }
                 } else {
-                    // no mask info, make fully opaque
                     for c in bits.chunks_exact_mut(4) {
                         c[3] = 255;
                     }
                 }
             }
         } else if !is_color {
-            // monochrome icon: bits currently contains mask; turn into black/white with alpha
             for c in bits.chunks_exact_mut(4) {
                 let is_white = c[0] == 255 && c[1] == 255 && c[2] == 255;
                 if is_white {
