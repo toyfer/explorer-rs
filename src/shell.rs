@@ -4,13 +4,13 @@
 //!   Explorer shows, converts it to RGBA via `GetIconInfo` + `GetDIBits`, and
 //!   returns raw bytes for egui to cache as textures. Single-binary, no assets.
 //! - Type name: `SHGFI_TYPENAME` gives "テキスト ドキュメント", "PNG ファイル" etc.
-//! - Helpers: `normalize_path_input` accepts both `\\` and `/` on any OS.
+//! - Helpers: `normalize_path_input` accepts both `\` and `/` on any OS.
 
 use std::path::Path;
 
-/// Normalize a user-entered path so both `\\` and `/` are accepted on any OS.
-/// On Windows, `/` is treated as `\\` (except UNC `\\\\` is preserved).
-/// On Unix, `\\` is treated as `/` so `C:\\Users` style input still works.
+/// Normalize a user-entered path so both `\` and `/` are accepted on any OS.
+/// On Windows, `/` is treated as `\` (except UNC `\\` is preserved).
+/// On Unix, `\` is treated as `/` so `C:\Users` style input still works.
 pub fn normalize_path_input(input: &str) -> std::path::PathBuf {
     let s = input.trim();
     if s.is_empty() {
@@ -100,7 +100,7 @@ mod windows_shell {
     }
 
     pub fn reveal_in_explorer(path: &Path) -> anyhow::Result<()> {
-        // explorer /select,C:\\path\\to\\file — single arg form
+        // explorer /select,C:\path\to\file — single arg form
         let path_str = path.display().to_string();
         let select_arg = format!("/select,{path_str}");
         std::process::Command::new("explorer")
@@ -413,7 +413,7 @@ mod tests {
     fn normalize_trims() {
         let p = normalize_path_input("  C:/a  ");
         #[cfg(windows)]
-        assert_eq!(p.to_string_lossy().as_ref(), r"C:\\a");
+        assert_eq!(p.to_string_lossy().as_ref(), r"C:\a");
         #[cfg(not(windows))]
         assert_eq!(p.to_string_lossy().as_ref(), "C:/a");
     }
