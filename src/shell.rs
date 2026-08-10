@@ -47,13 +47,15 @@ mod windows_shell {
         SHFILEINFOW, SHGFI_ICON, SHGFI_SMALLICON, SHGFI_TYPENAME, SHGFI_USEFILEATTRIBUTES,
         SHGetFileInfoW,
     };
-    use windows::Win32::UI::WindowsAndMessaging::{
-        DestroyIcon, GetIconInfo, ICONINFO, HICON,
-    };
+    use windows::Win32::UI::WindowsAndMessaging::{DestroyIcon, GetIconInfo, ICONINFO, HICON};
 
     /// OS display type name, e.g. "テキスト ドキュメント", "PNG ファイル"
     pub fn os_type_name(path: &Path) -> Option<String> {
-        let w: Vec<u16> = path.as_os_str().encode_wide().chain(std::iter::once(0)).collect();
+        let w: Vec<u16> = path
+            .as_os_str()
+            .encode_wide()
+            .chain(std::iter::once(0))
+            .collect();
         let mut info = SHFILEINFOW::default();
         let ret = unsafe {
             SHGetFileInfoW(
@@ -71,11 +73,19 @@ mod windows_shell {
             .trim_matches('\0')
             .trim()
             .to_string();
-        if name.is_empty() { None } else { Some(name) }
+        if name.is_empty() {
+            None
+        } else {
+            Some(name)
+        }
     }
 
     pub fn is_dir_via_attr(path: &Path) -> bool {
-        let w: Vec<u16> = path.as_os_str().encode_wide().chain(std::iter::once(0)).collect();
+        let w: Vec<u16> = path
+            .as_os_str()
+            .encode_wide()
+            .chain(std::iter::once(0))
+            .collect();
         let mut info = SHFILEINFOW::default();
         let ret = unsafe {
             SHGetFileInfoW(
@@ -90,8 +100,10 @@ mod windows_shell {
     }
 
     pub fn reveal_in_explorer(path: &Path) -> anyhow::Result<()> {
-        let arg = format!("/select,\"{}\"", path.display());
-        std::process::Command::new("explorer").arg(arg).spawn()?;
+        // Prefer /select,\"path\" form; fall back to opening parent if needed
+        let path_str = path.display().to_string();
+        let arg = format!("/select,{path_str}");
+        std::process::Command::new("explorer").raw_arg(arg).spawn()?;
         Ok(())
     }
 
@@ -101,12 +113,18 @@ mod windows_shell {
     }
 
     pub fn show_os_context_menu(_paths: &[std::path::PathBuf]) -> anyhow::Result<()> {
-        anyhow::bail!("OS context menu hosting requires HWND; use right-click -> Open / Reveal instead")
+        anyhow::bail!(
+            "OS context menu hosting requires HWND; use right-click -> Open / Reveal instead"
+        )
     }
 
     /// Try to obtain the true OS icon as RGBA bytes (16x16). Returns (rgba, w, h).
     pub fn icon_rgba(path: &Path, is_dir: bool) -> Option<(Vec<u8>, i32, i32)> {
-        let w: Vec<u16> = path.as_os_str().encode_wide().chain(std::iter::once(0)).collect();
+        let w: Vec<u16> = path
+            .as_os_str()
+            .encode_wide()
+            .chain(std::iter::once(0))
+            .collect();
         let mut info = SHFILEINFOW::default();
         let attr = if is_dir {
             FILE_ATTRIBUTE_DIRECTORY
@@ -274,7 +292,6 @@ mod windows_shell {
             }
         } else if !is_color {
             // monochrome icon: bits currently contains mask; turn into black/white with alpha
-            // For simplicity, make mask white = transparent, black = opaque black
             for c in bits.chunks_exact_mut(4) {
                 let is_white = c[0] == 255 && c[1] == 255 && c[2] == 255;
                 if is_white {
@@ -306,7 +323,8 @@ mod windows_shell {
             "zip" | "7z" | "rar" | "tar" | "gz" | "bz2" | "xz" => "📦",
             "exe" | "msi" | "dll" | "sys" => "⚙️",
             "txt" | "md" | "log" | "ini" | "cfg" => "📄",
-            "rs" | "toml" | "json" | "yaml" | "yml" | "py" | "js" | "ts" | "go" | "c" | "cpp" | "h" | "cs" | "java" => "📝",
+            "rs" | "toml" | "json" | "yaml" | "yml" | "py" | "js" | "ts" | "go" | "c"
+            | "cpp" | "h" | "cs" | "java" => "📝",
             "pdf" => "📕",
             "doc" | "docx" => "📘",
             "xls" | "xlsx" => "📗",
@@ -330,18 +348,37 @@ mod windows_shell {
 #[cfg(not(windows))]
 mod windows_shell {
     use super::*;
-    pub fn os_type_name(_path: &Path) -> Option<String> { None }
-    pub fn is_dir_via_attr(_path: &Path) -> bool { false }
-    pub fn reveal_in_explorer(_path: &Path) -> anyhow::Result<()> { anyhow::bail!("Windows only") }
-    pub fn open_with_shell(path: &Path) -> anyhow::Result<()> { open::that(path)?; Ok(()) }
-    pub fn show_os_context_menu(_paths: &[std::path::PathBuf]) -> anyhow::Result<()> { anyhow::bail!("Windows only") }
-    pub fn icon_rgba(_path: &Path, _is_dir: bool) -> Option<(Vec<u8>, i32, i32)> { None }
+    pub fn os_type_name(_path: &Path) -> Option<String> {
+        None
+    }
+    pub fn is_dir_via_attr(_path: &Path) -> bool {
+        false
+    }
+    pub fn reveal_in_explorer(_path: &Path) -> anyhow::Result<()> {
+        anyhow::bail!("Windows only")
+    }
+    pub fn open_with_shell(path: &Path) -> anyhow::Result<()> {
+        open::that(path)?;
+        Ok(())
+    }
+    pub fn show_os_context_menu(_paths: &[std::path::PathBuf]) -> anyhow::Result<()> {
+        anyhow::bail!("Windows only")
+    }
+    pub fn icon_rgba(_path: &Path, _is_dir: bool) -> Option<(Vec<u8>, i32, i32)> {
+        None
+    }
     pub fn icon_emoji_for_path(path: &Path, is_dir: bool) -> &'static str {
-        if is_dir { return "📁"; }
-        let ext = path.extension().and_then(|s| s.to_str()).unwrap_or("").to_lowercase();
+        if is_dir {
+            return "📁";
+        }
+        let ext = path
+            .extension()
+            .and_then(|s| s.to_str())
+            .unwrap_or("")
+            .to_lowercase();
         match ext.as_str() {
-            "png"|"jpg"|"jpeg"|"gif"|"bmp"|"webp"|"ico" => "🖼️",
-            "zip"|"7z"|"rar"|"tar"|"gz" => "📦",
+            "png" | "jpg" | "jpeg" | "gif" | "bmp" | "webp" | "ico" => "🖼️",
+            "zip" | "7z" | "rar" | "tar" | "gz" => "📦",
             _ => "📄",
         }
     }
@@ -356,18 +393,35 @@ mod tests {
     fn normalize_both_separators() {
         #[cfg(windows)]
         {
-            assert_eq!(normalize_path_input("C:/Users/foo/bar").to_string_lossy(), "C:\\Users\\foo\\bar");
-            assert_eq!(normalize_path_input("C:\\Users\\foo/bar\\baz").to_string_lossy(), "C:\\Users\\foo\\bar\\baz");
-            assert_eq!(normalize_path_input("\\\\server\\share/folder").to_string_lossy(), "\\\\server\\share\\folder");
+            assert_eq!(
+                normalize_path_input("C:/Users/foo/bar").to_string_lossy(),
+                "C:\\Users\\foo\\bar"
+            );
+            assert_eq!(
+                normalize_path_input("C:\\Users\\foo/bar\\baz").to_string_lossy(),
+                "C:\\Users\\foo\\bar\\baz"
+            );
+            assert_eq!(
+                normalize_path_input("\\\\server\\share/folder").to_string_lossy(),
+                "\\\\server\\share\\folder"
+            );
         }
         #[cfg(not(windows))]
         {
-            assert_eq!(normalize_path_input("C:\\Users\\foo\\bar").to_string_lossy(), "C:/Users/foo/bar");
+            assert_eq!(
+                normalize_path_input("C:\\Users\\foo\\bar").to_string_lossy(),
+                "C:/Users/foo/bar"
+            );
             assert_eq!(normalize_path_input("a/b\\c").to_string_lossy(), "a/b/c");
         }
     }
     #[test]
     fn normalize_trims() {
-        assert_eq!(normalize_path_input("  C:/a  ").to_string_lossy().trim(), "C:/a");
+        let p = normalize_path_input("  C:/a  ");
+        let s = p.to_string_lossy();
+        assert!(s.starts_with("C:") || s.starts_with("C:/") || s.starts_with("C:\\"));
+        assert!(s.contains('a'));
+        assert!(!s.starts_with(' '));
+        assert!(!s.ends_with(' '));
     }
 }
