@@ -1,28 +1,28 @@
 //! Natural (human) sort: "file2" < "file10".
 
-use std::cmp::Ordering;
+use std::cmp::Ordering::{self, Equal, Greater, Less};
 
 pub fn natural_cmp(a: &str, b: &str) -> Ordering {
     let mut ac = a.chars().peekable();
     let mut bc = b.chars().peekable();
     loop {
         match (ac.peek().copied(), bc.peek().copied()) {
-            (None, None) => return Ordering::Equal,
-            (None, Some(_)) => return Ordering::Less,
-            (Some(_), None) => return Ordering::Greater,
+            (None, None) => return Equal,
+            (None, Some(_)) => return Less,
+            (Some(_), None) => return Greater,
             (Some(ca), Some(cb)) => {
                 if ca.is_ascii_digit() && cb.is_ascii_digit() {
                     let na = take_u64(&mut ac);
                     let nb = take_u64(&mut bc);
                     match na.cmp(&nb) {
-                        Ordering::Equal => continue,
+                        Equal => continue,
                         o => return o,
                     }
                 } else {
                     let ca = ac.next().unwrap().to_ascii_lowercase();
                     let cb = bc.next().unwrap().to_ascii_lowercase();
                     match ca.cmp(&cb) {
-                        Ordering::Equal => continue,
+                        Equal => continue,
                         o => return o,
                     }
                 }
@@ -50,20 +50,20 @@ mod tests {
 
     #[test]
     fn numbers_in_names() {
-        assert_eq!(natural_cmp("file2.txt", "file10.txt"), Ordering::Less);
-        assert_eq!(natural_cmp("file10.txt", "file2.txt"), Ordering::Greater);
-        assert_eq!(natural_cmp("file2.txt", "file2.txt"), Ordering::Equal);
+        assert_eq!(natural_cmp("file2.txt", "file10.txt"), Less);
+        assert_eq!(natural_cmp("file10.txt", "file2.txt"), Greater);
+        assert_eq!(natural_cmp("file2.txt", "file2.txt"), Equal);
     }
 
     #[test]
     fn case_insensitive_letters() {
-        assert_eq!(natural_cmp("Abc", "abc"), Ordering::Equal);
-        assert_eq!(natural_cmp("a", "b"), Ordering::Less);
+        assert_eq!(natural_cmp("Abc", "abc"), Equal);
+        assert_eq!(natural_cmp("a", "b"), Less);
     }
 
     #[test]
     fn mixed() {
-        assert_eq!(natural_cmp("img2", "img10"), Ordering::Less);
-        assert_eq!(natural_cmp("a100", "a99"), Ordering::Greater);
+        assert_eq!(natural_cmp("img2", "img10"), Less);
+        assert_eq!(natural_cmp("a100", "a99"), Greater);
     }
 }
