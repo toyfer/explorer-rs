@@ -97,7 +97,6 @@ impl Tab {
             focus: None,
             anchor: None,
         };
-        // Initial load only — subsequent navigation should prefer async list workers.
         t.refresh();
         t
     }
@@ -118,8 +117,7 @@ impl Tab {
                         if !show_hidden && entry.is_hidden {
                             continue;
                         }
-                        if !filter_lc.is_empty() && !entry.name.to_lowercase().contains(&filter_lc)
-                        {
+                        if !filter_lc.is_empty() && !entry.name.to_lowercase().contains(&filter_lc) {
                             continue;
                         }
                         entries.push(entry);
@@ -196,7 +194,6 @@ impl Tab {
         self.anchor = self.focus;
     }
 
-    /// Synchronous refresh — prefer `request_refresh_async` from UI after navigation.
     pub fn refresh(&mut self) {
         let (mut entries, error) =
             Self::list_blocking(&self.current, self.show_hidden, &self.filter);
@@ -224,8 +221,7 @@ impl Tab {
         self.anchor = self.focus;
     }
 
-    /// Change directory without blocking list. Caller must kick async list.
-    /// Returns true if navigation happened.
+    /// Non-blocking path change. Caller should `request_refresh_async`.
     pub fn navigate_to_async(&mut self, path: PathBuf) -> bool {
         if path == self.current {
             return false;
@@ -246,8 +242,16 @@ impl Tab {
     }
 
     pub fn navigate_to(&mut self, path: PathBuf) {
-        if self.navigate_to_async(path) {
-            // Fallback sync load (tests / callers without BG). UI prefers async path.
+        if path == self.current {
+            return;
+        }
+        if path.exists() && path.is_dir() {
+            self.history_back.push(self.current.clone());
+            self.history_forward.clear();
+            self.current = path;
+            self.selected.clear();
+            self.focus = None;
+            self.anchor = None;
             self.refresh();
         }
     }
@@ -259,8 +263,7 @@ impl Tab {
             self.selected.clear();
             self.focus = None;
             self.anchor = None;
-            self.entries.clear();
-            self.error = None;
+            self.refresh();
             true
         } else {
             false
@@ -274,8 +277,7 @@ impl Tab {
             self.selected.clear();
             self.focus = None;
             self.anchor = None;
-            self.entries.clear();
-            self.error = None;
+            self.refresh();
             true
         } else {
             false
@@ -285,7 +287,8 @@ impl Tab {
     pub fn go_up(&mut self) -> bool {
         if let Some(parent) = self.current.parent().map(|p| p.to_path_buf()) {
             if parent != self.current {
-                return self.navigate_to_async(parent);
+                self.navigate_to(parent);
+                return true;
             }
         }
         false
@@ -403,13 +406,10 @@ impl Tab {
             }
             self.focus = Some(0);
             let anchor = self.anchor.unwrap_or(0);
-            let (a, b) = if anchor <= 0 {
-                (0, anchor)
-            } else {
-                (0, anchor)
-            };
+            let lo = anchor.min(0);
+            let hi = anchor.max(0);
             self.selected.clear();
-            for i in a.min(b)..=a.max(b) {
+            for i in lo..=hi {
                 self.selected.insert(i);
             }
         } else {
@@ -446,7 +446,7 @@ impl Tab {
     pub fn enter_primary(&mut self) -> Option<PathBuf> {
         let entry = self.primary_selected()?.clone();
         if entry.is_dir {
-            let _ = self.navigate_to_async(entry.path);
+            self.navigate_to(entry.path);
             None
         } else {
             Some(entry.path)
@@ -571,7 +571,7 @@ mod tests {
     }
 
     #[test]
-    fn navigate_async_clears_without_blocking_list() {
+    fn navigate_async_clears_without_list() {
         let a = tmp("nav-a");
         let b = tmp("nav-b");
         fs::create_dir_all(&a).unwrap();
