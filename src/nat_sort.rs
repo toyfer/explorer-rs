@@ -1,28 +1,30 @@
 //! Natural (human) sort: "file2" < "file10".
 //! Used for Name column so power users get Explorer-like ordering.
 
+use std::cmp::Ordering;
+
 /// Compare two strings with numeric awareness (Unicode scalars).
-pub fn natural_cmp(a: &str, b: &str) -> std::cmp::Ordering {
+pub fn natural_cmp(a: &str, b: &str) -> Ordering {
     let mut ac = a.chars().peekable();
     let mut bc = b.chars().peekable();
     loop {
         match (ac.peek().copied(), bc.peek().copied()) {
-            (None, None) => return std::cmp::Ordering::Equal(),
-            (None, Some(_)) => return std::cmp::Ordering::Less,
-            (Some(_), None) => return std::cmp::Ordering::Greater,
+            (None, None) => return Ordering::Equal,
+            (None, Some(_)) => return Ordering::Less,
+            (Some(_), None) => return Ordering::Greater,
             (Some(ca), Some(cb)) => {
                 if ca.is_ascii_digit() && cb.is_ascii_digit() {
                     let na = take_u64(&mut ac);
                     let nb = take_u64(&mut bc);
                     match na.cmp(&nb) {
-                        std::cmp::Ordering::Equal() => continue,
+                        Ordering::Equal => continue,
                         o => return o,
                     }
                 } else {
                     let ca = ac.next().unwrap().to_ascii_lowercase();
                     let cb = bc.next().unwrap().to_ascii_lowercase();
                     match ca.cmp(&cb) {
-                        std::cmp::Ordering::Equal() => continue,
+                        Ordering::Equal => continue,
                         o => return o,
                     }
                 }
@@ -33,24 +35,20 @@ pub fn natural_cmp(a: &str, b: &str) -> std::cmp::Ordering {
 
 fn take_u64(it: &mut std::iter::Peekable<std::str::Chars<'_>>) -> u64 {
     let mut n: u64 = 0;
-    let mut any = false;
     while let Some(c) = it.peek().copied() {
         if c.is_ascii_digit() {
-            any = true;
             let _ = it.next();
             n = n.saturating_mul(10).saturating_add((c as u8 - b'0') as u64);
         } else {
             break;
         }
     }
-    debug_assert!(any);
     n
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::cmp::Ordering;
 
     #[test]
     fn numbers_in_names() {

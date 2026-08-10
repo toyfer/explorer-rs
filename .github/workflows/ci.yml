@@ -37,8 +37,8 @@ jobs:
         shell: pwsh
         run: |
           cargo check --all-targets --verbose 2>&1 | Tee-Object -FilePath check.log
-          "exit=$LASTEXITCODE" | Out-File check.exit.txt -Encoding utf8
-          exit 0
+          if ($LASTEXITCODE -ne 0) { "exit=$LASTEXITCODE" | Out-File check.exit.txt -Encoding utf8; exit $LASTEXITCODE }
+          "exit=0" | Out-File check.exit.txt -Encoding utf8
 
       - name: Clippy
         continue-on-error: true
@@ -48,22 +48,30 @@ jobs:
           "exit=$LASTEXITCODE" | Out-File clippy.exit.txt -Encoding utf8
           exit 0
 
-      - name: Tests
-        continue-on-error: true
+      - name: Tests (hard fail)
         shell: pwsh
         run: |
           cargo test --all --verbose 2>&1 | Tee-Object -FilePath test.log
-          "exit=$LASTEXITCODE" | Out-File test.exit.txt -Encoding utf8
-          exit 0
+          if ($LASTEXITCODE -ne 0) { "exit=$LASTEXITCODE" | Out-File test.exit.txt -Encoding utf8; exit $LASTEXITCODE }
+          "exit=0" | Out-File test.exit.txt -Encoding utf8
+
+      - name: Bench list 5k (Windows real machine)
+        shell: pwsh
+        env:
+          EXPLORER_RS_BENCH_JSON: "1"
+        run: |
+          cargo test --test windows_bench -- --nocapture 2>&1 | Tee-Object -FilePath bench.log
+          if ($LASTEXITCODE -ne 0) { "exit=$LASTEXITCODE" | Out-File bench.exit.txt -Encoding utf8; exit $LASTEXITCODE }
+          "exit=0" | Out-File bench.exit.txt -Encoding utf8
+          if (Test-Path bench-summary.json) { Get-Content bench-summary.json | Tee-Object -FilePath bench-summary.echo.txt }
 
       - name: Build release (crt-static)
-        continue-on-error: true
         shell: pwsh
         run: |
           $env:RUSTFLAGS = "-C target-feature=+crt-static"
           cargo build --release --verbose 2>&1 | Tee-Object -FilePath build.log
-          "exit=$LASTEXITCODE" | Out-File build.exit.txt -Encoding utf8
-          exit 0
+          if ($LASTEXITCODE -ne 0) { "exit=$LASTEXITCODE" | Out-File build.exit.txt -Encoding utf8; exit $LASTEXITCODE }
+          "exit=0" | Out-File build.exit.txt -Encoding utf8
 
       - name: PE verify
         shell: pwsh
@@ -73,8 +81,10 @@ jobs:
             $b = [IO.File]::ReadAllBytes($bin)
             $line = "PE_MAGIC={0:X2}{1:X2} SIZE_MB={2}" -f $b[0], $b[1], [math]::Round($b.Length/1MB,2)
             $line | Tee-Object pe.log
+            if ($b[0] -ne 0x4D -or $b[1] -ne 0x5A) { Write-Error "Not PE"; exit 1 }
           } else {
             "PE_MISSING" | Tee-Object pe.log
+            exit 1
           }
 
       - name: Upload artifact
@@ -86,8 +96,10 @@ jobs:
             check.log
             clippy.log
             test.log
+            bench.log
             build.log
             pe.log
+            bench-summary.json
             *.exit.txt
           if-no-files-found: warn
           retention-days: 14
@@ -102,17 +114,23 @@ jobs:
           $run = "${{ github.run_id }}"
           $staging = Join-Path $env:RUNNER_TEMP "logstage"
           New-Item -ItemType Directory -Force -Path $staging | Out-Null
-          foreach ($f in @("check.log","clippy.log","test.log","build.log","pe.log","check.exit.txt","clippy.exit.txt","test.exit.txt","build.exit.txt")) {
+          foreach ($f in @(
+            "check.log","clippy.log","test.log","bench.log","build.log","pe.log",
+            "bench-summary.json",
+            "check.exit.txt","clippy.exit.txt","test.exit.txt","bench.exit.txt","build.exit.txt"
+          )) {
             if (Test-Path $f) { Copy-Item $f $staging -Force }
           }
           if (Test-Path check.log) { Get-Content check.log -Tail 300 | Set-Content (Join-Path $staging "check.tail.txt") -Encoding utf8 }
           if (Test-Path build.log) { Get-Content build.log -Tail 300 | Set-Content (Join-Path $staging "build.tail.txt") -Encoding utf8 }
           if (Test-Path clippy.log) { Get-Content clippy.log -Tail 200 | Set-Content (Join-Path $staging "clippy.tail.txt") -Encoding utf8 }
-          if (Test-Path test.log) { Get-Content test.log -Tail 150 | Set-Content (Join-Path $staging "test.tail.txt") -Encoding utf8 }
+          if (Test-Path test.log) { Get-Content test.log -Tail 200 | Set-Content (Join-Path $staging "test.tail.txt") -Encoding utf8 }
+          if (Test-Path bench.log) { Get-Content bench.log -Tail 100 | Set-Content (Join-Path $staging "bench.tail.txt") -Encoding utf8 }
           @"
           sha=${{ github.sha }}
           run_id=$run
           time=$(Get-Date -Format o)
+          principles=docs/PRINCIPLES.md
           "@ | Set-Content (Join-Path $staging "meta.txt") -Encoding utf8
 
           git config user.name "github-actions[bot]"

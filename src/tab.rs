@@ -5,6 +5,7 @@ use std::time::SystemTime;
 use walkdir::WalkDir;
 
 use crate::config::SortBy;
+use crate::nat_sort;
 
 #[derive(Debug, Clone)]
 pub struct FileEntry {
@@ -68,7 +69,6 @@ fn is_hidden_path(p: &Path, name: &str, md: &std::fs::Metadata) -> bool {
 pub struct Tab {
     pub current: PathBuf,
     pub entries: Vec<FileEntry>,
-    /// Multi-selection (sorted indices into entries)
     pub selected: BTreeSet<usize>,
     pub history_back: Vec<PathBuf>,
     pub history_forward: Vec<PathBuf>,
@@ -77,7 +77,6 @@ pub struct Tab {
     pub sort_desc: bool,
     pub show_hidden: bool,
     pub error: Option<String>,
-    /// Cursor / anchor for shift-range selection
     pub focus: Option<usize>,
     pub anchor: Option<usize>,
 }
@@ -98,11 +97,11 @@ impl Tab {
             focus: None,
             anchor: None,
         };
+        // Initial load only — subsequent navigation should prefer async list workers.
         t.refresh();
         t
     }
 
-    /// Blocking directory scan used by background workers.
     pub fn list_blocking(
         dir: &Path,
         show_hidden: bool,
@@ -132,14 +131,13 @@ impl Tab {
         (entries, error)
     }
 
-    /// Sort helper that can be called from background thread (no selection remap).
     pub fn sort_entries(entries: &mut Vec<FileEntry>, sort_by: SortBy, sort_desc: bool) {
         match sort_by {
             SortBy::Name => entries.sort_by(|a, b| {
                 let ord = b
                     .is_dir
                     .cmp(&a.is_dir)
-                    .then(a.name.to_lowercase().cmp(&b.name.to_lowercase()));
+                    .then_with(|| nat_sort::natural_cmp(&a.name, &b.name));
                 if sort_desc {
                     ord.reverse()
                 } else {
@@ -167,7 +165,7 @@ impl Tab {
                     .is_dir
                     .cmp(&a.is_dir)
                     .then(a.ext.cmp(&b.ext))
-                    .then(a.name.to_lowercase().cmp(&b.name.to_lowercase()));
+                    .then_with(|| nat_sort::natural_cmp(&a.name, &b.name));
                 if sort_desc {
                     ord.reverse()
                 } else {
@@ -177,7 +175,6 @@ impl Tab {
         }
     }
 
-    /// Apply a background list result, preserving selection by path.
     pub fn apply_list(&mut self, entries: Vec<FileEntry>, error: Option<String>) {
         let selected_paths: Vec<PathBuf> = self
             .selected
@@ -199,33 +196,12 @@ impl Tab {
         self.anchor = self.focus;
     }
 
+    /// Synchronous refresh — prefer `request_refresh_async` from UI after navigation.
     pub fn refresh(&mut self) {
         let (mut entries, error) =
             Self::list_blocking(&self.current, self.show_hidden, &self.filter);
         Self::sort_entries(&mut entries, self.sort_by, self.sort_desc);
-        let selected_paths: Vec<PathBuf> = self
-            .selected
-            .iter()
-            .filter_map(|&i| self.entries.get(i).map(|e| e.path.clone()))
-            .collect();
-        let focus_path = self
-            .focus
-            .and_then(|i| self.entries.get(i).map(|e| e.path.clone()));
-        self.entries = entries;
-        self.error = error;
-        self.selected.clear();
-        for (i, e) in self.entries.iter().enumerate() {
-            if selected_paths.iter().any(|p| p == &e.path) {
-                self.selected.insert(i);
-            }
-        }
-        if focus_path.is_some() {
-            self.focus = focus_path.and_then(|p| self.entries.iter().position(|e| e.path == p));
-            self.anchor = self.focus;
-        } else {
-            self.focus = None;
-            self.anchor = None;
-        }
+        self.apply_list(entries, error);
     }
 
     pub fn sort(&mut self) {
@@ -248,17 +224,30 @@ impl Tab {
         self.anchor = self.focus;
     }
 
-    pub fn navigate_to(&mut self, path: PathBuf) {
+    /// Change directory without blocking list. Caller must kick async list.
+    /// Returns true if navigation happened.
+    pub fn navigate_to_async(&mut self, path: PathBuf) -> bool {
         if path == self.current {
-            return;
+            return false;
         }
-        if path.exists() && path.is_dir() {
+        if path.is_dir() {
             self.history_back.push(self.current.clone());
             self.history_forward.clear();
             self.current = path;
             self.selected.clear();
             self.focus = None;
             self.anchor = None;
+            self.entries.clear();
+            self.error = None;
+            true
+        } else {
+            false
+        }
+    }
+
+    pub fn navigate_to(&mut self, path: PathBuf) {
+        if self.navigate_to_async(path) {
+            // Fallback sync load (tests / callers without BG). UI prefers async path.
             self.refresh();
         }
     }
@@ -270,7 +259,8 @@ impl Tab {
             self.selected.clear();
             self.focus = None;
             self.anchor = None;
-            self.refresh();
+            self.entries.clear();
+            self.error = None;
             true
         } else {
             false
@@ -284,7 +274,8 @@ impl Tab {
             self.selected.clear();
             self.focus = None;
             self.anchor = None;
-            self.refresh();
+            self.entries.clear();
+            self.error = None;
             true
         } else {
             false
@@ -294,22 +285,19 @@ impl Tab {
     pub fn go_up(&mut self) -> bool {
         if let Some(parent) = self.current.parent().map(|p| p.to_path_buf()) {
             if parent != self.current {
-                self.navigate_to(parent);
-                return true;
+                return self.navigate_to_async(parent);
             }
         }
         false
     }
 
     pub fn primary_selected(&self) -> Option<&FileEntry> {
-        self.focus
-            .and_then(|i| self.entries.get(i))
-            .or_else(|| {
-                self.selected
-                    .iter()
-                    .next()
-                    .and_then(|&i| self.entries.get(i))
-            })
+        self.focus.and_then(|i| self.entries.get(i)).or_else(|| {
+            self.selected
+                .iter()
+                .next()
+                .and_then(|&i| self.entries.get(i))
+        })
     }
 
     pub fn selected_paths(&self) -> Vec<PathBuf> {
@@ -366,7 +354,6 @@ impl Tab {
         }
     }
 
-    /// Invert selection (Ctrl+I style).
     pub fn invert_selection(&mut self) {
         let all: BTreeSet<usize> = (0..self.entries.len()).collect();
         self.selected = all.difference(&self.selected).copied().collect();
@@ -379,7 +366,6 @@ impl Tab {
         self.anchor = None;
     }
 
-    /// Move focus by delta (Arrow / Page keys). Shift extends range from anchor.
     pub fn move_focus_by(&mut self, delta: isize, extend: bool) {
         let len = self.entries.len();
         if len == 0 {
@@ -417,7 +403,11 @@ impl Tab {
             }
             self.focus = Some(0);
             let anchor = self.anchor.unwrap_or(0);
-            let (a, b) = if anchor <= 0 { (0, anchor) } else { (0, anchor) };
+            let (a, b) = if anchor <= 0 {
+                (0, anchor)
+            } else {
+                (0, anchor)
+            };
             self.selected.clear();
             for i in a.min(b)..=a.max(b) {
                 self.selected.insert(i);
@@ -456,14 +446,13 @@ impl Tab {
     pub fn enter_primary(&mut self) -> Option<PathBuf> {
         let entry = self.primary_selected()?.clone();
         if entry.is_dir {
-            self.navigate_to(entry.path);
+            let _ = self.navigate_to_async(entry.path);
             None
         } else {
             Some(entry.path)
         }
     }
 
-    /// Blocking recursive search (call from background thread).
     pub fn search_blocking(root: &Path, query: &str, max_results: usize) -> Vec<FileEntry> {
         if query.is_empty() {
             return vec![];
@@ -497,15 +486,20 @@ mod tests {
     use super::*;
     use crate::config::SortBy;
     use std::fs;
-    #[test]
-    fn sort_dirs_first() {
-        let dir = std::env::temp_dir().join(format!(
-            "explorer-rs-tab-{}",
+
+    fn tmp(name: &str) -> PathBuf {
+        std::env::temp_dir().join(format!(
+            "explorer-rs-{name}-{}",
             std::time::SystemTime::now()
                 .duration_since(std::time::UNIX_EPOCH)
                 .unwrap()
                 .as_nanos()
-        ));
+        ))
+    }
+
+    #[test]
+    fn sort_dirs_first() {
+        let dir = tmp("tab");
         fs::create_dir_all(dir.join("sub")).unwrap();
         fs::write(dir.join("a.txt"), b"x").unwrap();
         fs::write(dir.join("z.txt"), b"y").unwrap();
@@ -514,15 +508,23 @@ mod tests {
         assert_eq!(tab.entries[0].name, "sub");
         let _ = fs::remove_dir_all(dir);
     }
+
+    #[test]
+    fn natural_name_order() {
+        let dir = tmp("natsort");
+        fs::create_dir_all(&dir).unwrap();
+        for n in ["file10.txt", "file2.txt", "file1.txt"] {
+            fs::write(dir.join(n), b"x").unwrap();
+        }
+        let tab = Tab::new(dir.clone(), true, SortBy::Name, false);
+        let names: Vec<_> = tab.entries.iter().map(|e| e.name.as_str()).collect();
+        assert_eq!(names, vec!["file1.txt", "file2.txt", "file10.txt"]);
+        let _ = fs::remove_dir_all(dir);
+    }
+
     #[test]
     fn multi_select_range() {
-        let dir = std::env::temp_dir().join(format!(
-            "explorer-rs-sel-{}",
-            std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .unwrap()
-                .as_nanos()
-        ));
+        let dir = tmp("sel");
         fs::create_dir_all(&dir).unwrap();
         for i in 0..5 {
             fs::write(dir.join(format!("f{i}.txt")), b"x").unwrap();
@@ -537,15 +539,10 @@ mod tests {
         assert!(tab.selected.is_empty());
         let _ = fs::remove_dir_all(dir);
     }
+
     #[test]
     fn list_blocking_filters_hidden() {
-        let dir = std::env::temp_dir().join(format!(
-            "explorer-rs-hidden-{}",
-            std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .unwrap()
-                .as_nanos()
-        ));
+        let dir = tmp("hidden");
         fs::create_dir_all(&dir).unwrap();
         fs::write(dir.join(".hidden"), b"x").unwrap();
         fs::write(dir.join("visible.txt"), b"x").unwrap();
@@ -556,15 +553,10 @@ mod tests {
         assert_eq!(entries2.len(), 2);
         let _ = fs::remove_dir_all(dir);
     }
+
     #[test]
     fn move_focus_by_clamps() {
-        let dir = std::env::temp_dir().join(format!(
-            "explorer-rs-focus-{}",
-            std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .unwrap()
-                .as_nanos()
-        ));
+        let dir = tmp("focus");
         fs::create_dir_all(&dir).unwrap();
         for i in 0..3 {
             fs::write(dir.join(format!("f{i}.txt")), b"x").unwrap();
@@ -576,5 +568,21 @@ mod tests {
         tab.move_focus_by(-100, false);
         assert_eq!(tab.focus, Some(0));
         let _ = fs::remove_dir_all(dir);
+    }
+
+    #[test]
+    fn navigate_async_clears_without_blocking_list() {
+        let a = tmp("nav-a");
+        let b = tmp("nav-b");
+        fs::create_dir_all(&a).unwrap();
+        fs::create_dir_all(&b).unwrap();
+        fs::write(a.join("x.txt"), b"x").unwrap();
+        let mut tab = Tab::new(a.clone(), true, SortBy::Name, false);
+        assert!(!tab.entries.is_empty());
+        assert!(tab.navigate_to_async(b.clone()));
+        assert!(tab.entries.is_empty());
+        assert_eq!(tab.current, b);
+        let _ = fs::remove_dir_all(a);
+        let _ = fs::remove_dir_all(b);
     }
 }
