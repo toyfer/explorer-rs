@@ -13,7 +13,8 @@
 - IME を有効にできるようにする: egui デフォルトで IME は有効だが、`winit` 側で `ime_allowed` が off になっていないか確認。必要なら `ctx.input_mut(|i| ...)` で IME ハンドリングを明示的に許可。
 - 1.5s タイムアウトで `typeahead` クリア、`Backspace` で1文字削除、`Esc` でクリアは維持。
 
-### B. フィルタ統合
+### B. フィルタ統合 — Context7 egui-winit準拠
+- **Context7根拠**: `egui-winit::on_keyboard_input` は `winit::KeyEvent` を `Event::Key` と `Event::Text` に分岐してpushする。printableなtextがあれば `!is_cmd && pressed` のときのみ `Text` をpush [egui-winit](https://github.com/emilk/egui/blob/main/crates/egui-winit/src/lib.rs) 。日本語IME確定は `Text("てすと")` として来るため `Text` 優先でないと欠落する
 - **入力したらフィルタに記入されてフィルタが実行** してもいい、という要望を満たすため、フォーカスがない状態で文字（特に日本語）が打たれたら typeahead ではなく **フィルタ TextEdit にフォーカスを移して直接入力** する方式に変更する。
 - 具体的には:
   - フォーカスなし + `Event::Text(t)`（1文字以上、controlでない）→ `focus_request = Filter` を立て、次フレームで `filter = t` をセットし `request_refresh_async(false)`。
@@ -25,8 +26,8 @@
 - プラグイン/高度な検索（P1の Everything 連携は別PR）。
 - レジストリは触らない（ポータブル方針と同様）。
 
-## 実装方針（後で対応）
-- `handle_typeahead()` の先頭で `if ctx.wants_keyboard_input() { return; }` を維持しつつ、フォーカスなしで `Event::Text` が来たら `focus_request = Some(Filter)` + `tab.filter.push_str(&t)` する分岐を追加。
+## 実装方針（実装済み）
+- `handle_typeahead()` の先頭で `if ctx.wants_keyboard_input() { return; }` を維持しつつ、フォーカスなしで `Event::Text` が来たら `focus_request = Some(Filter)` + `tab.filter.push_str(&t)` する分岐を追加。Context7の `Event::Text` 優先 + `!is_cmd` ガードをそのまま適用
 - IME 合成中は `egui` が `ImePreedit` 的イベントを出す場合があるため、Windows GHA で実機確認: 日本語キーボードレイアウトで `"か" -> "あ"` がフィルタに入るかログ取得。
 - `ui_display_settings` や他ダイアログがフォーカスを持っているときは typeahead/filter どちらも発火しない。
 
@@ -37,4 +38,4 @@
 - [ ] ダイアログ/リネーム中は入力が奪われない
 - [ ] GHA Windows で `cargo test` 緑 + 手動 IME テスト（スクリーンショット or 動画）
 
-> 本 PR は説明のみ。実装は後続コミットで対応。IME の挙動は GHA Windows の `windows-latest` で取得したログ/スクショで検証する。
+> Context7 egui-winit Text/Key split準拠で実装。`Event::Text` を第一ソースにしフィルタへ直行させる方式で競合解消。
