@@ -5,7 +5,6 @@ mod commands;
 mod config;
 mod fonts;
 mod fs_ops;
-mod icon_ctx;
 mod nat_sort;
 mod shell;
 mod tab;
