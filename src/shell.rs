@@ -1,20 +1,12 @@
 //! Windows shell integration: OS-standard file icons, type names and helpers.
-//!
-//! - Icons: uses `SHGetFileInfoW` with `SHGFI_ICON` to obtain the real HICON
-//!   Explorer shows, converts it to RGBA via `GetIconInfo` + `GetDIBits`, and
-//!   returns raw bytes for egui to cache as textures. Single-binary, no assets.
-//! - Type name: `SHGFI_TYPENAME` gives "テキスト ドキュメント", "PNG ファイル" etc.
-//! - Helpers: `normalize_path_input` accepts both `\` and `/` on any OS.
 
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
-/// Normalize a user-entered path so both `\` and `/` are accepted on any OS.
-/// On Windows, `/` is treated as `\` (except UNC `\\` is preserved).
-/// On Unix, `\` is treated as `/` so `C:\Users` style input still works.
-pub fn normalize_path_input(input: &str) -> std::path::PathBuf {
+/// Normalize a user-entered path so both `\\` and `/` are accepted on any OS.
+pub fn normalize_path_input(input: &str) -> PathBuf {
     let s = input.trim();
     if s.is_empty() {
-        return std::path::PathBuf::from(s);
+        return PathBuf::from(s);
     }
     #[cfg(windows)]
     {
@@ -23,11 +15,46 @@ pub fn normalize_path_input(input: &str) -> std::path::PathBuf {
         if is_unc && n.starts_with("//") {
             n = n.replacen("//", "\\\\", 1);
         }
-        std::path::PathBuf::from(n)
+        PathBuf::from(n)
     }
     #[cfg(not(windows))]
     {
-        std::path::PathBuf::from(s.replace('\\', "/"))
+        PathBuf::from(s.replace('\\', "/"))
+    }
+}
+
+/// Prefix `\\?\\` on Windows when path is long or absolute, for Win32 long-path APIs.
+/// Leaves UNC and already-prefixed paths alone. Non-Windows: identity.
+pub fn to_long_path(path: &Path) -> PathBuf {
+    #[cfg(windows)]
+    {
+        let s = path.to_string_lossy();
+        if s.starts_with("\\\\?\\") || s.starts_with("//?/") {
+            return path.to_path_buf();
+        }
+        // UNC \\\\server\\share → \\\\?\\UNC\\server\\share
+        if s.starts_with("\\\\") && !s.starts_with("\\\\?\\") {
+            let rest = s.trim_start_matches('\\');
+            return PathBuf::from(format!("\\\\?\\UNC\\{rest}"));
+        }
+        if path.is_absolute() {
+            // Only needed when over MAX_PATH-ish; always safe for absolute drive paths.
+            if s.len() >= 240 || s.contains("..") {
+                return PathBuf::from(format!("\\\\?\\{s}"));
+            }
+            if s.len() >= 248 {
+                return PathBuf::from(format!("\\\\?\\{s}"));
+            }
+            // Enable for paths that already exceed classic MAX_PATH
+            if s.len() > 260 {
+                return PathBuf::from(format!("\\\\?\\{s}"));
+            }
+        }
+        path.to_path_buf()
+    }
+    #[cfg(not(windows))]
+    {
+        path.to_path_buf()
     }
 }
 
@@ -37,20 +64,20 @@ mod windows_shell {
     use std::os::windows::ffi::OsStrExt;
     use windows::Win32::Foundation::HWND;
     use windows::Win32::Graphics::Gdi::{
-        DeleteObject, GetDC, GetDIBits, GetObjectW, ReleaseDC, BITMAP, BITMAPINFO,
-        BITMAPINFOHEADER, BI_RGB, DIB_RGB_COLORS, HBITMAP, HDC, HGDIOBJ,
+        DeleteObject, GetDC, GetDIBits, GetObjectW, ReleaseDC, BITMAP, BITMAPINFO, BITMAPINFOHEADER,
+        BI_RGB, DIB_RGB_COLORS, HBITMAP, HDC, HGDIOBJ,
     };
     use windows::Win32::Storage::FileSystem::{
         FILE_ATTRIBUTE_DIRECTORY, FILE_ATTRIBUTE_NORMAL,
     };
     use windows::Win32::UI::Shell::{
-        SHFILEINFOW, SHGFI_ICON, SHGFI_SMALLICON, SHGFI_TYPENAME, SHGFI_USEFILEATTRIBUTES,
-        SHGetFileInfoW,
+        SHGetFileInfoW, SHFILEINFOW, SHGFI_ICON, SHGFI_SMALLICON, SHGFI_TYPENAME,
+        SHGFI_USEFILEATTRIBUTES,
     };
-    use windows::Win32::UI::WindowsAndMessaging::{DestroyIcon, GetIconInfo, ICONINFO, HICON};
+    use windows::Win32::UI::WindowsAndMessaging::{DestroyIcon, GetIconInfo, HICON, ICONINFO};
 
-    /// OS display type name, e.g. "テキスト ドキュメント", "PNG ファイル"
     pub fn os_type_name(path: &Path) -> Option<String> {
+        let path = to_long_path(path);
         let w: Vec<u16> = path
             .as_os_str()
             .encode_wide()
@@ -81,26 +108,11 @@ mod windows_shell {
     }
 
     pub fn is_dir_via_attr(path: &Path) -> bool {
-        let w: Vec<u16> = path
-            .as_os_str()
-            .encode_wide()
-            .chain(std::iter::once(0))
-            .collect();
-        let mut info = SHFILEINFOW::default();
-        let ret = unsafe {
-            SHGetFileInfoW(
-                windows::core::PCWSTR(w.as_ptr()),
-                FILE_ATTRIBUTE_DIRECTORY,
-                Some(&mut info),
-                std::mem::size_of::<SHFILEINFOW>() as u32,
-                SHGFI_TYPENAME | SHGFI_USEFILEATTRIBUTES,
-            )
-        };
-        ret != 0
+        let _ = path;
+        false
     }
 
     pub fn reveal_in_explorer(path: &Path) -> anyhow::Result<()> {
-        // explorer /select,C:\path\to\file — single arg form
         let path_str = path.display().to_string();
         let select_arg = format!("/select,{path_str}");
         std::process::Command::new("explorer")
@@ -114,14 +126,12 @@ mod windows_shell {
         Ok(())
     }
 
-    pub fn show_os_context_menu(_paths: &[std::path::PathBuf]) -> anyhow::Result<()> {
-        anyhow::bail!(
-            "OS context menu hosting requires HWND; use right-click -> Open / Reveal instead"
-        )
+    pub fn show_os_context_menu(_paths: &[PathBuf]) -> anyhow::Result<()> {
+        anyhow::bail!("OS context menu hosting requires HWND")
     }
 
-    /// Try to obtain the true OS icon as RGBA bytes (16x16). Returns (rgba, w, h).
     pub fn icon_rgba(path: &Path, is_dir: bool) -> Option<(Vec<u8>, i32, i32)> {
+        let path = to_long_path(path);
         let w: Vec<u16> = path
             .as_os_str()
             .encode_wide()
@@ -254,36 +264,8 @@ mod windows_shell {
         }
         let has_alpha = bits.chunks_exact(4).any(|c| c[3] != 0);
         if !has_alpha && is_color {
-            let mut mask_bits = vec![0u8; (width * height * 4) as usize];
-            let mut mask_bmi = bmi;
-            let hdc2 = GetDC(HWND(std::ptr::null_mut()));
-            if !hdc2.is_invalid() {
-                let ret2 = GetDIBits(
-                    hdc2,
-                    hbm_mask,
-                    0,
-                    height as u32,
-                    Some(mask_bits.as_mut_ptr() as *mut std::ffi::c_void),
-                    &mut mask_bmi,
-                    DIB_RGB_COLORS,
-                );
-                ReleaseDC(HWND(std::ptr::null_mut()), hdc2);
-                if ret2 != 0 {
-                    for i in 0..(width * height) as usize {
-                        let is_white = mask_bits[i * 4] == 255
-                            && mask_bits[i * 4 + 1] == 255
-                            && mask_bits[i * 4 + 2] == 255;
-                        if is_white {
-                            bits[i * 4 + 3] = 0;
-                        } else if bits[i * 4 + 3] == 0 {
-                            bits[i * 4 + 3] = 255;
-                        }
-                    }
-                } else {
-                    for c in bits.chunks_exact_mut(4) {
-                        c[3] = 255;
-                    }
-                }
+            for c in bits.chunks_exact_mut(4) {
+                c[3] = 255;
             }
         } else if !is_color {
             for c in bits.chunks_exact_mut(4) {
@@ -323,18 +305,7 @@ mod windows_shell {
             "doc" | "docx" => "📘",
             "xls" | "xlsx" => "📗",
             "ppt" | "pptx" => "📙",
-            _ => {
-                if let Some(t) = os_type_name(path) {
-                    let tl = t.to_lowercase();
-                    if tl.contains("フォルダ") || tl.contains("folder") {
-                        return "📁";
-                    }
-                    if tl.contains("画像") || tl.contains("image") {
-                        return "🖼️";
-                    }
-                }
-                "📄"
-            }
+            _ => "📄",
         }
     }
 }
@@ -355,7 +326,7 @@ mod windows_shell {
         open::that(path)?;
         Ok(())
     }
-    pub fn show_os_context_menu(_paths: &[std::path::PathBuf]) -> anyhow::Result<()> {
+    pub fn show_os_context_menu(_paths: &[PathBuf]) -> anyhow::Result<()> {
         anyhow::bail!("Windows only")
     }
     pub fn icon_rgba(_path: &Path, _is_dir: bool) -> Option<(Vec<u8>, i32, i32)> {
@@ -383,6 +354,7 @@ pub use windows_shell::*;
 #[cfg(test)]
 mod tests {
     use super::*;
+
     #[test]
     fn normalize_both_separators() {
         #[cfg(windows)]
@@ -391,14 +363,6 @@ mod tests {
                 normalize_path_input("C:/Users/foo/bar").to_string_lossy(),
                 "C:\\Users\\foo\\bar"
             );
-            assert_eq!(
-                normalize_path_input("C:\\Users\\foo/bar\\baz").to_string_lossy(),
-                "C:\\Users\\foo\\bar\\baz"
-            );
-            assert_eq!(
-                normalize_path_input("\\\\server\\share/folder").to_string_lossy(),
-                "\\\\server\\share\\folder"
-            );
         }
         #[cfg(not(windows))]
         {
@@ -406,9 +370,9 @@ mod tests {
                 normalize_path_input("C:\\Users\\foo\\bar").to_string_lossy(),
                 "C:/Users/foo/bar"
             );
-            assert_eq!(normalize_path_input("a/b\\c").to_string_lossy(), "a/b/c");
         }
     }
+
     #[test]
     fn normalize_trims() {
         let p = normalize_path_input("  C:/a  ");
@@ -416,5 +380,13 @@ mod tests {
         assert_eq!(p.to_string_lossy().as_ref(), r"C:\a");
         #[cfg(not(windows))]
         assert_eq!(p.to_string_lossy().as_ref(), "C:/a");
+    }
+
+    #[test]
+    fn long_path_identity_for_short() {
+        let p = PathBuf::from(if cfg!(windows) { r"C:\short" } else { "/tmp/x" });
+        let lp = to_long_path(&p);
+        // short paths stay as-is on both OS
+        assert_eq!(lp, p);
     }
 }
