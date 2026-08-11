@@ -266,7 +266,6 @@ impl ExplorerApp {
                     self.update_preview();
                 }
                 BgEvent::FsChanged => {
-                    // Quiet — do not clobber user status text
                     self.request_refresh_async(false);
                     if self.dual_pane {
                         self.request_refresh_async(true);
@@ -1389,7 +1388,7 @@ impl eframe::App for ExplorerApp {
                 }
                 ui.separator();
                 ui.label("アドレス:");
-                let mut addr_edit = egui::TextEdit::singleline(&mut self.address)
+                let addr_edit = egui::TextEdit::singleline(&mut self.address)
                     .desired_width(if compact { 320.0 } else { 420.0 })
                     .hint_text("パス… (\\ と / 可)  Ctrl+L");
                 let resp = ui.add(addr_edit);
@@ -2009,6 +2008,7 @@ impl ExplorerApp {
         let row_h = 22.0 * self.config.row_height_scale;
         let num_rows = entries.len().max(1);
         let scroll_to = self.scroll_to_row.take();
+        let egui_ctx = ui.ctx().clone();
 
         egui_extras::TableBuilder::new(ui)
             .striped(true)
@@ -2074,7 +2074,7 @@ impl ExplorerApp {
                     if scroll_to == Some(idx) {
                         row.set_selected(true);
                     }
-                    let tex = self.get_or_load_icon(row.ctx(), &entry.path, entry.is_dir);
+                    let tex = self.get_or_load_icon(&egui_ctx, &entry.path, entry.is_dir);
                     let emoji = shell::icon_emoji_for_path(&entry.path, entry.is_dir).to_string();
                     row.col(|ui| {
                         if is_focus && !is_sel {
@@ -2082,7 +2082,7 @@ impl ExplorerApp {
                             ui.painter().rect_stroke(
                                 rect,
                                 0.0,
-                                egui::Stroke::new(1.0, egui::Color32::from_rgb(80, 160, 255)),
+                                egui::Stroke::new(1.0_f32, egui::Color32::from_rgb(80, 160, 255)),
                             );
                         }
                         let ctrl = ui.input(|i| i.modifiers.command || i.modifiers.ctrl);
