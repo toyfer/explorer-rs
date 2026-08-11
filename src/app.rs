@@ -1389,7 +1389,7 @@ impl eframe::App for ExplorerApp {
                 }
                 ui.separator();
                 ui.label("アドレス:");
-                let mut addr_edit = egui::TextEdit::singleline(&mut self.address)
+                let addr_edit = egui::TextEdit::singleline(&mut self.address)
                     .desired_width(if compact { 320.0 } else { 420.0 })
                     .hint_text("パス… (\\ と / 可)  Ctrl+L");
                 let resp = ui.add(addr_edit);
@@ -2074,7 +2074,7 @@ impl ExplorerApp {
                     if scroll_to == Some(idx) {
                         row.set_selected(true);
                     }
-                    let tex = self.get_or_load_icon(row.ctx(), &entry.path, entry.is_dir);
+                    let tex = self.get_or_load_icon(ui.ctx(), &entry.path, entry.is_dir);
                     let emoji = shell::icon_emoji_for_path(&entry.path, entry.is_dir).to_string();
                     row.col(|ui| {
                         if is_focus && !is_sel {
@@ -2082,7 +2082,7 @@ impl ExplorerApp {
                             ui.painter().rect_stroke(
                                 rect,
                                 0.0,
-                                egui::Stroke::new(1.0, egui::Color32::from_rgb(80, 160, 255)),
+                                egui::Stroke::new(1.0_f32, egui::Color32::from_rgb(80, 160, 255)),
                             );
                         }
                         let ctrl = ui.input(|i| i.modifiers.command || i.modifiers.ctrl);
