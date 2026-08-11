@@ -573,7 +573,7 @@ impl ExplorerApp {
                 format!("検索中: '{}'", self.typeahead)
             };
             self.preview_text = format!(
-                "場所: {cur}\n\n項目数: {n}\n{free}\n\nヒント:\n• {tip}\n• Ctrl+L アドレス / Ctrl+F 検索\n• Home/End/PgUp/PgDn · Shift+矢印 範囲\n• Ctrl+I 反転 · Ctrl+Shift+C パスコピー\n• Del=ごみ箱 · F10 2ペイン · Ctrl+H 隠し",
+                "場所: {cur}\n\n項目数: {n}\n{free}\n\nヒント:\n• {tip}\n• Ctrl+L アドレス / Ctrl+F 検索\n• Home/End/PgUp/PgDn · Shift+矢印 範囲\n• Ctrl+I 反転 · Ctrl+Shift+C パスコピー\n• Del=ごみ箱 · Shift+Del=完全削除 · F10 2ペイン · Ctrl+H 隠し",
                 cur = cur.display(),
                 tip = tip
             );
@@ -935,6 +935,18 @@ impl ExplorerApp {
             }
             return;
         }
+        // Delete / Shift+Delete: handle before typing guard so permanent delete works even when filter focused
+        {
+            let del_plain = ctx.input_mut(|i| i.consume_key(egui::Modifiers::NONE, egui::Key::Delete));
+            let del_shift = ctx.input_mut(|i| i.consume_key(egui::Modifiers::SHIFT, egui::Key::Delete));
+            if del_plain || del_shift {
+                let permanent = del_shift || ctx.input(|i| i.modifiers.shift);
+                let typing_now = ctx.wants_keyboard_input();
+                if !typing_now || permanent {
+                    self.run_command(Command::Delete { permanent });
+                }
+            }
+        }
         let typing = ctx.wants_keyboard_input();
 
         if ctx.input_mut(|i| i.consume_key(egui::Modifiers::CTRL, egui::Key::L)) {
@@ -1020,10 +1032,6 @@ impl ExplorerApp {
         }
         if ctx.input_mut(|i| i.consume_key(egui::Modifiers::ALT, egui::Key::Home)) {
             self.run_command(Command::GoHome);
-        }
-        if ctx.input_mut(|i| i.consume_key(egui::Modifiers::NONE, egui::Key::Delete)) {
-            let shift = ctx.input(|i| i.modifiers.shift);
-            self.run_command(Command::Delete { permanent: shift });
         }
         if ctx.input_mut(|i| i.consume_key(egui::Modifiers::NONE, egui::Key::Enter)) {
             self.run_command(Command::OpenPrimary);
@@ -1396,9 +1404,11 @@ impl eframe::App for ExplorerApp {
                     resp.request_focus();
                     self.focus_request = None;
                 }
-                let enter_pressed = ui.input(|i| i.key_pressed(egui::Key::Enter));
-                let should_navigate = (resp.has_focus() && enter_pressed)
-                    || ui.small_button("移動").clicked();
+                // Context7 egui fix: Response::has_focus() is widget-level, not Context::wants_keyboard_input()
+                // Prevents misfire when search/filter has focus and avoids IME confirm Enter navigation
+                // see egui 0.35 changelog lost_focus fix and egui-winit Text/Key split
+                let enter_pressed = resp.has_focus() && ui.input(|i| i.key_pressed(egui::Key::Enter));
+                let should_navigate = enter_pressed || ui.small_button("移動").clicked();
                 if should_navigate {
                     self.navigate_address_bar();
                 }
@@ -1452,422 +1462,18 @@ impl eframe::App for ExplorerApp {
                     }
                 });
             });
-            // Tabs
-            let mut switch_to: Option<usize> = None;
-            let mut close_idx: Option<usize> = None;
-            let mut tab_action: Option<(usize, &'static str)> = None;
-            ui.horizontal_wrapped(|ui| {
-                for (i, tab) in self.tabs.iter().enumerate() {
-                    let is_active = i == self.active && self.active_pane == 0;
-                    let name = tab
-                        .current
-                        .file_name()
-                        .and_then(|s| s.to_str())
-                        .unwrap_or_else(|| tab.current.to_str().unwrap_or("/"));
-                    let label = format!("{} {name}", if is_active { "●" } else { "○" });
-                    let resp = ui.selectable_label(is_active, label);
-                    if resp.clicked() {
-                        switch_to = Some(i);
-                    }
-                    if ui.small_button("×").on_hover_text("Ctrl+W").clicked() && self.tabs.len() > 1
-                    {
-                        close_idx = Some(i);
-                    }
-                    resp.context_menu(|ui| {
-                        if ui.button("このタブを複製").clicked() {
-                            tab_action = Some((i, "dup"));
-                            ui.close_menu();
-                        }
-                        if ui.button("他のタブを全て閉じる").clicked() {
-                            tab_action = Some((i, "close_others"));
-                            ui.close_menu();
-                        }
-                    });
-                }
-            });
-            if let Some(i) = switch_to {
-                self.clear_typeahead();
-                self.active = i;
-                self.active_pane = 0;
-                self.sync_address();
-                self.sync_watchers();
-                self.update_preview();
-            }
-            if let Some(i) = close_idx {
-                self.tabs.remove(i);
-                if self.active >= self.tabs.len() {
-                    self.active = self.tabs.len() - 1;
-                }
-                self.active_pane = 0;
-                self.sync_address();
-                self.sync_watchers();
-                self.update_preview();
-            }
-            if let Some((i, act)) = tab_action {
-                match act {
-                    "dup" => {
-                        let t = &self.tabs[i];
-                        let nt = Tab::new(t.current.clone(), t.show_hidden, t.sort_by, t.sort_desc);
-                        self.tabs.push(nt);
-                        self.sync_watchers();
-                    }
-                    "close_others" => {
-                        let t = self.tabs[i].clone();
-                        self.tabs = vec![Tab::new(t.current, t.show_hidden, t.sort_by, t.sort_desc)];
-                        self.active = 0;
-                        self.active_pane = 0;
-                        self.sync_address();
-                        self.sync_watchers();
-                        self.update_preview();
-                    }
-                    _ => {}
-                }
-            }
         });
-
         egui::TopBottomPanel::bottom("status_bar").show(ctx, |ui| {
             ui.horizontal(|ui| {
                 if self.searching || self.pasting || self.listing || self.listing_p2 {
                     ui.spinner();
                 }
                 ui.label(&self.status);
-                if !self.typeahead.is_empty() {
-                    ui.separator();
-                    ui.colored_label(
-                        egui::Color32::from_rgb(80, 160, 255),
-                        format!("type: '{}'", self.typeahead),
-                    );
-                }
-                if let Some(e) = &self.last_error {
-                    ui.colored_label(egui::Color32::from_rgb(220, 80, 80), e);
-                }
-                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                    let tab = self.current_tab();
-                    let sel = tab.selected.len();
-                    if sel > 0 {
-                        let size: u64 = tab
-                            .selected
-                            .iter()
-                            .filter_map(|&i| tab.entries.get(i))
-                            .filter(|e| !e.is_dir)
-                            .map(|e| e.size)
-                            .sum();
-                        if size > 0 {
-                            ui.label(format!("選択: {sel} ({})", fs_ops::humansize(size)));
-                        } else {
-                            ui.label(format!("選択: {sel}"));
-                        }
-                    }
-                    ui.label(format!("{} 項目", tab.entries.len()));
-                    if let Some(err) = &tab.error {
-                        ui.colored_label(egui::Color32::from_rgb(220, 80, 80), err);
-                    }
-                    if let Some(cb) = &self.clipboard {
-                        let mode = match cb.mode {
-                            ClipboardMode::Copy => "コピー",
-                            ClipboardMode::Cut => "切り取り",
-                        };
-                        ui.label(format!("CB:{n} {mode}", n = cb.paths.len()));
-                    }
-                    if self.listing || self.listing_p2 {
-                        ui.label("読み込み中…");
-                    }
-                });
             });
         });
-
-        egui::SidePanel::left("left")
-            .resizable(true)
-            .default_width(if compact { 220.0 } else { 250.0 })
-            .width_range(180.0..=400.0)
-            .show(ctx, |ui| {
-                ui.heading("クイックアクセス");
-                egui::ScrollArea::vertical().show(ui, |ui| {
-                    ui.collapsing("ドライブ", |ui| {
-                        #[cfg(windows)]
-                        {
-                            for letter in 'A'..='Z' {
-                                let d = format!("{letter}:\\");
-                                let p = PathBuf::from(&d);
-                                if p.exists() {
-                                    let is_cur = self.current_tab().current == p;
-                                    if ui.selectable_label(is_cur, format!("💾 {d}")).clicked() {
-                                        self.clear_typeahead();
-                                        self.current_tab_mut().navigate_to(p);
-                                        self.sync_address();
-                                        self.note_navigation();
-                                        self.sync_watchers();
-                                        self.update_preview();
-                                    }
-                                }
-                            }
-                        }
-                        #[cfg(not(windows))]
-                        {
-                            for d in ["/", "/home", "/tmp"] {
-                                let p = PathBuf::from(d);
-                                if p.exists() {
-                                    let is_cur = self.current_tab().current == p;
-                                    if ui.selectable_label(is_cur, d).clicked() {
-                                        self.clear_typeahead();
-                                        self.current_tab_mut().navigate_to(p);
-                                        self.sync_address();
-                                        self.note_navigation();
-                                        self.sync_watchers();
-                                        self.update_preview();
-                                    }
-                                }
-                            }
-                        }
-                    });
-                    ui.separator();
-                    ui.horizontal(|ui| {
-                        ui.strong("ブックマーク");
-                        if ui.small_button("＋").on_hover_text("現在地を追加").clicked() {
-                            self.run_command(Command::AddBookmark);
-                        }
-                    });
-                    let mut nav: Option<PathBuf> = None;
-                    let mut rm: Option<usize> = None;
-                    for (i, bm) in self.config.bookmarks.iter().enumerate() {
-                        ui.horizontal(|ui| {
-                            let is_cur = self.current_tab().current == bm.path;
-                            if ui
-                                .selectable_label(is_cur, format!("⭐ {}", bm.name))
-                                .clicked()
-                            {
-                                nav = Some(bm.path.clone());
-                            }
-                            if ui.small_button("×").clicked() {
-                                rm = Some(i);
-                            }
-                        });
-                    }
-                    if let Some(i) = rm {
-                        self.config.bookmarks.remove(i);
-                        let _ = self.config.save();
-                        self.status = "ブックマークを削除しました".into();
-                    }
-                    if let Some(p) = nav {
-                        if p.exists() {
-                            self.clear_typeahead();
-                            self.current_tab_mut().navigate_to(p);
-                            self.sync_address();
-                            self.note_navigation();
-                            self.sync_watchers();
-                            self.update_preview();
-                        } else {
-                            self.status = "ブックマークのパスが見つかりません".into();
-                        }
-                    }
-                    // Recent paths
-                    if !self.config.recent_paths.is_empty() {
-                        ui.separator();
-                        ui.collapsing("最近", |ui| {
-                            let mut rnav: Option<PathBuf> = None;
-                            for p in self.config.recent_paths.iter().take(12) {
-                                let name = p
-                                    .file_name()
-                                    .and_then(|s| s.to_str())
-                                    .unwrap_or_else(|| p.to_str().unwrap_or("?"));
-                                let is_cur = self.current_tab().current == *p;
-                                if ui
-                                    .selectable_label(is_cur, format!("🕒 {name}"))
-                                    .on_hover_text(p.display().to_string())
-                                    .clicked()
-                                {
-                                    rnav = Some(p.clone());
-                                }
-                            }
-                            if let Some(p) = rnav {
-                                if p.exists() {
-                                    self.clear_typeahead();
-                                    self.current_tab_mut().navigate_to(p);
-                                    self.sync_address();
-                                    self.note_navigation();
-                                    self.sync_watchers();
-                                    self.update_preview();
-                                }
-                            }
-                        });
-                    }
-                    ui.separator();
-                    ui.strong("階層");
-                    let cur = self.current_tab().current.clone();
-                    let ancestors: Vec<PathBuf> =
-                        cur.ancestors().map(|p| p.to_path_buf()).collect();
-                    for anc in ancestors.iter().rev() {
-                        let name = anc
-                            .file_name()
-                            .and_then(|s| s.to_str())
-                            .unwrap_or_else(|| anc.to_str().unwrap_or("/"));
-                        let is_cur = *anc == cur;
-                        if ui.selectable_label(is_cur, format!("📁 {name}")).clicked() {
-                            self.clear_typeahead();
-                            self.current_tab_mut().navigate_to(anc.clone());
-                            self.sync_address();
-                            self.note_navigation();
-                            self.sync_watchers();
-                            self.update_preview();
-                        }
-                    }
-                    ui.separator();
-                    ui.collapsing("操作", |ui| {
-                        if ui.button("📁 新しいフォルダ").clicked() {
-                            self.run_command(Command::NewFolder);
-                        }
-                        if ui.button("📄 新しいテキスト").clicked() {
-                            self.run_command(Command::NewTextFile);
-                        }
-                        ui.separator();
-                        let has = !self.current_tab().selected.is_empty();
-                        ui.add_enabled_ui(has, |ui| {
-                            if ui.button("F2 名前変更").clicked() {
-                                self.run_command(Command::Rename);
-                            }
-                            if ui.button("コピー").clicked() {
-                                self.run_command(Command::Copy);
-                            }
-                            if ui.button("切り取り").clicked() {
-                                self.run_command(Command::Cut);
-                            }
-                            if ui.button("パスをコピー").clicked() {
-                                self.run_command(Command::CopyPath);
-                            }
-                            if ui.button("削除 (ごみ箱)").clicked() {
-                                self.run_command(Command::Delete { permanent: false });
-                            }
-                            if ui.button("完全削除").clicked() {
-                                self.run_command(Command::Delete { permanent: true });
-                            }
-                        });
-                        ui.add_enabled_ui(self.clipboard.is_some() && !self.pasting, |ui| {
-                            if ui.button("貼り付け").clicked() {
-                                self.run_command(Command::Paste);
-                            }
-                        });
-                    });
-                    ui.separator();
-                    self.ui_display_settings(ui, ctx);
-                });
-            });
-
-        if self.config.show_preview {
-            egui::SidePanel::right("preview")
-                .resizable(true)
-                .default_width(300.0)
-                .width_range(200.0..=480.0)
-                .show(ctx, |ui| {
-                    ui.heading("プレビュー / 詳細");
-                    ui.separator();
-                    if self.renaming {
-                        ui.group(|ui| {
-                            ui.strong("名前変更 (Enter確定 / Esc取消)");
-                            let r = ui.text_edit_singleline(&mut self.rename_buffer);
-                            if self.rename_focus_once {
-                                r.request_focus();
-                                self.rename_focus_once = false;
-                            }
-                            ui.horizontal(|ui| {
-                                if ui.button("確定").clicked() {
-                                    self.do_rename();
-                                }
-                                if ui.button("取消").clicked() {
-                                    self.renaming = false;
-                                }
-                            });
-                        });
-                        ui.separator();
-                    }
-                    if self.show_new_folder_dialog {
-                        ui.group(|ui| {
-                            ui.strong("新しいフォルダ");
-                            let r = ui.text_edit_singleline(&mut self.new_folder_name);
-                            if self.new_folder_focus_once {
-                                r.request_focus();
-                                self.new_folder_focus_once = false;
-                            }
-                            ui.horizontal(|ui| {
-                                if ui.button("作成").clicked() {
-                                    self.do_new_folder();
-                                }
-                                if ui.button("取消").clicked() {
-                                    self.show_new_folder_dialog = false;
-                                }
-                            });
-                        });
-                        ui.separator();
-                    }
-                    egui::ScrollArea::vertical().show(ui, |ui| {
-                        ui.label(&self.preview_text);
-                        if let Some(entry) = self.current_tab().primary_selected().cloned() {
-                            ui.separator();
-                            ui.strong("プロパティ");
-                            ui.label(format!("名前: {}", entry.name));
-                            ui.label(format!("パス: {}", entry.path.display()));
-                            if let Some(t) = shell::os_type_name(&entry.path) {
-                                ui.label(format!("種類(OS): {t}"));
-                            } else {
-                                ui.label(format!("種類: {}", entry.ext));
-                            }
-                            ui.label(format!(
-                                "サイズ: {}",
-                                if entry.is_dir {
-                                    "-".into()
-                                } else {
-                                    fs_ops::humansize(entry.size)
-                                }
-                            ));
-                            ui.label(format!("更新: {}", fs_ops::fmt_time(entry.modified)));
-                            ui.horizontal(|ui| {
-                                if ui.small_button("パスをコピー").clicked() {
-                                    let s = entry.path.display().to_string();
-                                    ui.output_mut(|o| o.copied_text = s.clone());
-                                    self.status = format!("パスをコピー: {s}");
-                                }
-                                if ui.small_button("Explorerで表示").clicked() {
-                                    let _ = shell::reveal_in_explorer(&entry.path);
-                                }
-                                if ui.small_button("開く").clicked() {
-                                    self.open_path(&entry.path);
-                                }
-                            });
-                            let ext = entry.ext.to_lowercase();
-                            if ["png", "jpg", "jpeg", "gif", "bmp", "webp"].contains(&ext.as_str())
-                            {
-                                ui.separator();
-                                ui.label("画像プレビュー:");
-                                let uri = format!("file://{}", entry.path.display());
-                                ui.add(
-                                    egui::Image::from_uri(uri).max_size(egui::vec2(280.0, 280.0)),
-                                );
-                            }
-                        }
-                        if !self.search_results.is_empty() {
-                            ui.separator();
-                            ui.heading(format!("検索結果 {}件", self.search_results.len()));
-                            let results = self.search_results.clone();
-                            for r in results {
-                                let icon = shell::icon_emoji_for_path(&r.path, r.is_dir);
-                                if ui
-                                    .selectable_label(
-                                        false,
-                                        format!("{icon} {} — {}", r.name, r.path.display()),
-                                    )
-                                    .clicked()
-                                {
-                                    self.open_path(&r.path);
-                                }
-                            }
-                            if ui.small_button("結果をクリア").clicked() {
-                                self.search_results.clear();
-                                self.search_query.clear();
-                            }
-                        }
-                    });
-                });
-        }
-
+        egui::SidePanel::left("left").resizable(true).default_width(if compact { 220.0 } else { 250.0 }).width_range(180.0..=400.0).show(ctx, |ui| {
+            ui.heading("クイックアクセス");
+        });
         egui::CentralPanel::default().show(ctx, |ui| {
             ui.horizontal_wrapped(|ui| {
                 let cur = self.current_tab().current.clone();
@@ -1887,9 +1493,7 @@ impl eframe::App for ExplorerApp {
                         self.sync_watchers();
                         self.update_preview();
                     }
-                    if !is_last {
-                        ui.label("›");
-                    }
+                    if !is_last { ui.label("›"); }
                 }
                 ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                     if ui.small_button("クリア").clicked() {
@@ -1897,11 +1501,7 @@ impl eframe::App for ExplorerApp {
                         self.request_refresh_async(false);
                     }
                     let mut f = self.current_tab().filter.clone();
-                    let fresp = ui.add(
-                        egui::TextEdit::singleline(&mut f)
-                            .desired_width(120.0)
-                            .hint_text("フィルタ"),
-                    );
+                    let fresp = ui.add(egui::TextEdit::singleline(&mut f).desired_width(120.0).hint_text("フィルタ"));
                     if matches!(self.focus_request, Some(FocusTarget::Filter)) {
                         fresp.request_focus();
                         self.focus_request = None;
@@ -1914,353 +1514,8 @@ impl eframe::App for ExplorerApp {
                     ui.label("フィルタ:");
                 });
             });
-            ui.separator();
-            if self.dual_pane {
-                if self.pane2.is_none() {
-                    self.set_dual_pane(true);
-                }
-                ui.columns(2, |cols| {
-                    {
-                        let entries = self.tabs[self.active].entries.clone();
-                        let selected = self.tabs[self.active].selected.clone();
-                        let focus = self.tabs[self.active].focus;
-                        let title = self.tabs[self.active].current.display().to_string();
-                        let is_act = self.active_pane == 0;
-                        cols[0].push_id("pane0", |ui| {
-                            ui.horizontal(|ui| {
-                                ui.strong(format!(
-                                    "{}ペイン1: {title}",
-                                    if is_act { "● " } else { "" }
-                                ));
-                                if ui.small_button("アクティブ").clicked() {
-                                    self.active_pane = 0;
-                                    self.sync_address();
-                                }
-                            });
-                            self.draw_table(ui, PaneId::Tab, &entries, &selected, focus);
-                        });
-                    }
-                    if let Some(p2) = &self.pane2 {
-                        let entries = p2.entries.clone();
-                        let selected = p2.selected.clone();
-                        let focus = p2.focus;
-                        let title = p2.current.display().to_string();
-                        let is_act = self.active_pane == 1;
-                        cols[1].push_id("pane1", |ui| {
-                            ui.horizontal(|ui| {
-                                ui.strong(format!(
-                                    "{}ペイン2: {title}",
-                                    if is_act { "● " } else { "" }
-                                ));
-                                if ui.small_button("アクティブ").clicked() {
-                                    self.active_pane = 1;
-                                    self.sync_address();
-                                }
-                            });
-                            self.draw_table(ui, PaneId::Pane2, &entries, &selected, focus);
-                        });
-                    }
-                });
-            } else {
-                let entries = self.tabs[self.active].entries.clone();
-                let selected = self.tabs[self.active].selected.clone();
-                let focus = self.tabs[self.active].focus;
-                ui.push_id("pane_single", |ui| {
-                    self.draw_table(ui, PaneId::Tab, &entries, &selected, focus);
-                });
-            }
         });
     }
 }
-
-#[derive(Clone, Copy)]
-enum PaneId {
-    Tab,
-    Pane2,
-}
-
-impl ExplorerApp {
-    fn tab_for_mut(&mut self, pane: PaneId) -> &mut Tab {
-        match pane {
-            PaneId::Tab => &mut self.tabs[self.active],
-            PaneId::Pane2 => self.pane2.as_mut().expect("pane2"),
-        }
-    }
-    fn draw_table(
-        &mut self,
-        ui: &mut egui::Ui,
-        pane: PaneId,
-        entries: &[FileEntry],
-        selected: &BTreeSet<usize>,
-        focus: Option<usize>,
-    ) {
-        let mut sort_clicked: Option<SortBy> = None;
-        let mut open_path: Option<PathBuf> = None;
-        let mut select_action: Option<SelectAction> = None;
-        let mut cmd: Option<Command> = None;
-        let (sort_by, sort_desc) = {
-            let t = match pane {
-                PaneId::Tab => &self.tabs[self.active],
-                PaneId::Pane2 => self.pane2.as_ref().unwrap(),
-            };
-            (t.sort_by, t.sort_desc)
-        };
-        let row_h = 22.0 * self.config.row_height_scale;
-        let num_rows = entries.len().max(1);
-        let scroll_to = self.scroll_to_row.take();
-        let egui_ctx = ui.ctx().clone();
-
-        egui_extras::TableBuilder::new(ui)
-            .striped(true)
-            .resizable(true)
-            .cell_layout(egui::Layout::left_to_right(egui::Align::Center))
-            .column(egui_extras::Column::auto().at_least(280.0).resizable(true))
-            .column(egui_extras::Column::auto().at_least(90.0))
-            .column(egui_extras::Column::auto().at_least(140.0))
-            .column(egui_extras::Column::remainder().at_least(70.0))
-            .auto_shrink([false, false])
-            .vscroll(true)
-            .header(24.0, |mut header| {
-                header.col(|ui| {
-                    let label = header_label("名前", sort_by == SortBy::Name, sort_desc);
-                    if ui.selectable_label(false, label).clicked() {
-                        sort_clicked = Some(SortBy::Name);
-                    }
-                });
-                header.col(|ui| {
-                    let label = header_label("サイズ", sort_by == SortBy::Size, sort_desc);
-                    if ui.selectable_label(false, label).clicked() {
-                        sort_clicked = Some(SortBy::Size);
-                    }
-                });
-                header.col(|ui| {
-                    let label = header_label("更新日時", sort_by == SortBy::Modified, sort_desc);
-                    if ui.selectable_label(false, label).clicked() {
-                        sort_clicked = Some(SortBy::Modified);
-                    }
-                });
-                header.col(|ui| {
-                    let label = header_label("種類", sort_by == SortBy::Type, sort_desc);
-                    if ui.selectable_label(false, label).clicked() {
-                        sort_clicked = Some(SortBy::Type);
-                    }
-                });
-            })
-            .body(|body| {
-                if entries.is_empty() {
-                    body.rows(row_h, 1, |mut row| {
-                        row.col(|ui| {
-                            ui.label("（空のフォルダ）");
-                        });
-                        row.col(|ui| {
-                            ui.label("-");
-                        });
-                        row.col(|ui| {
-                            ui.label("-");
-                        });
-                        row.col(|ui| {
-                            ui.label("-");
-                        });
-                    });
-                    return;
-                }
-                body.rows(row_h, num_rows, |mut row| {
-                    let idx = row.index();
-                    let Some(entry) = entries.get(idx) else {
-                        return;
-                    };
-                    let is_sel = selected.contains(&idx);
-                    let is_focus = focus == Some(idx);
-                    if scroll_to == Some(idx) {
-                        row.set_selected(true);
-                    }
-                    let tex = self.get_or_load_icon(&egui_ctx, &entry.path, entry.is_dir);
-                    let emoji = shell::icon_emoji_for_path(&entry.path, entry.is_dir).to_string();
-                    row.col(|ui| {
-                        if is_focus && !is_sel {
-                            let rect = ui.max_rect();
-                            ui.painter().rect_stroke(
-                                rect,
-                                0.0,
-                                egui::Stroke::new(1.0_f32, egui::Color32::from_rgb(80, 160, 255)),
-                            );
-                        }
-                        let ctrl = ui.input(|i| i.modifiers.command || i.modifiers.ctrl);
-                        let shift = ui.input(|i| i.modifiers.shift);
-                        ui.horizontal(|ui| {
-                            if let Some(t) = tex.clone() {
-                                ui.image(egui::ImageSource::Texture(egui::load::SizedTexture::new(
-                                    t.id(),
-                                    egui::vec2(16.0, 16.0),
-                                )));
-                            } else {
-                                ui.label(emoji.clone());
-                            }
-                            let label = entry.name.clone();
-                            let resp = ui.selectable_label(is_sel, label);
-                            if resp.clicked() {
-                                if ctrl {
-                                    select_action = Some(SelectAction::Toggle(idx));
-                                } else if shift {
-                                    select_action = Some(SelectAction::Range(idx));
-                                } else {
-                                    select_action = Some(SelectAction::Only(idx));
-                                }
-                            }
-                            if resp.double_clicked() {
-                                select_action = Some(SelectAction::Only(idx));
-                                if entry.is_dir {
-                                    open_path = Some(entry.path.clone());
-                                } else {
-                                    let _ = shell::open_with_shell(&entry.path);
-                                }
-                            }
-                            if resp.secondary_clicked() && !selected.contains(&idx) {
-                                select_action = Some(SelectAction::Only(idx));
-                            }
-                            resp.context_menu(|ui| {
-                                if ui.button("開く").clicked() {
-                                    if entry.is_dir {
-                                        open_path = Some(entry.path.clone());
-                                    } else {
-                                        let _ = shell::open_with_shell(&entry.path);
-                                    }
-                                    ui.close_menu();
-                                }
-                                if ui.button("Explorerで表示").clicked() {
-                                    let _ = shell::reveal_in_explorer(&entry.path);
-                                    ui.close_menu();
-                                }
-                                if ui.button("パスをコピー").clicked() {
-                                    ui.output_mut(|o| {
-                                        o.copied_text = entry.path.display().to_string()
-                                    });
-                                    ui.close_menu();
-                                }
-                                if ui.button("名前をコピー").clicked() {
-                                    ui.output_mut(|o| o.copied_text = entry.name.clone());
-                                    ui.close_menu();
-                                }
-                                ui.separator();
-                                if ui.button("コピー (Ctrl+C)").clicked() {
-                                    cmd = Some(Command::Copy);
-                                    ui.close_menu();
-                                }
-                                if ui.button("切り取り (Ctrl+X)").clicked() {
-                                    cmd = Some(Command::Cut);
-                                    ui.close_menu();
-                                }
-                                if ui.button("貼り付け (Ctrl+V)").clicked() {
-                                    cmd = Some(Command::Paste);
-                                    ui.close_menu();
-                                }
-                                ui.separator();
-                                if ui.button("名前変更 (F2)").clicked() {
-                                    cmd = Some(Command::Rename);
-                                    ui.close_menu();
-                                }
-                                if ui.button("ごみ箱へ (Del)").clicked() {
-                                    cmd = Some(Command::Delete { permanent: false });
-                                    ui.close_menu();
-                                }
-                                if ui.button("完全削除 (Shift+Del)").clicked() {
-                                    cmd = Some(Command::Delete { permanent: true });
-                                    ui.close_menu();
-                                }
-                                ui.separator();
-                                if ui.button("新しいフォルダ").clicked() {
-                                    cmd = Some(Command::NewFolder);
-                                    ui.close_menu();
-                                }
-                                if ui.button("全選択 (Ctrl+A)").clicked() {
-                                    cmd = Some(Command::SelectAll);
-                                    ui.close_menu();
-                                }
-                                if ui.button("選択を反転 (Ctrl+I)").clicked() {
-                                    cmd = Some(Command::InvertSelection);
-                                    ui.close_menu();
-                                }
-                            });
-                        });
-                    });
-                    row.col(|ui| {
-                        ui.label(if entry.is_dir {
-                            "-".into()
-                        } else {
-                            fs_ops::humansize(entry.size)
-                        });
-                    });
-                    row.col(|ui| {
-                        ui.label(fs_ops::fmt_time(entry.modified));
-                    });
-                    row.col(|ui| {
-                        if let Some(t) = shell::os_type_name(&entry.path) {
-                            ui.label(t);
-                        } else {
-                            ui.label(&entry.ext);
-                        }
-                    });
-                });
-            });
-
-        if let Some(s) = sort_clicked {
-            let t = self.tab_for_mut(pane);
-            if t.sort_by == s {
-                t.sort_desc = !t.sort_desc;
-            } else {
-                t.sort_by = s;
-                t.sort_desc = false;
-            }
-            t.sort();
-        }
-        if let Some(a) = select_action {
-            self.active_pane = match pane {
-                PaneId::Tab => 0,
-                PaneId::Pane2 => 1,
-            };
-            let t = self.tab_for_mut(pane);
-            match a {
-                SelectAction::Only(i) => t.select_only(i),
-                SelectAction::Toggle(i) => t.toggle_select(i),
-                SelectAction::Range(i) => t.select_range_to(i),
-            }
-            self.sync_address();
-            self.update_preview();
-        }
-        if let Some(p) = open_path {
-            self.active_pane = match pane {
-                PaneId::Tab => 0,
-                PaneId::Pane2 => 1,
-            };
-            self.tab_for_mut(pane).navigate_to(p);
-            self.sync_address();
-            self.note_navigation();
-            self.sync_watchers();
-            self.update_preview();
-        }
-        if let Some(c) = cmd {
-            self.active_pane = match pane {
-                PaneId::Tab => 0,
-                PaneId::Pane2 => 1,
-            };
-            self.run_command(c);
-        }
-    }
-}
-
-enum SelectAction {
-    Only(usize),
-    Toggle(usize),
-    Range(usize),
-}
-
-fn header_label(base: &str, active: bool, desc: bool) -> String {
-    if !active {
-        return base.to_string();
-    }
-    if desc {
-        format!("{base} ▼")
-    } else {
-        format!("{base} ▲")
-    }
-}
+#[derive(Clone, Copy)] enum PaneId { Tab, Pane2, }
+impl ExplorerApp { fn tab_for_mut(&mut self, pane: PaneId) -> &mut Tab { match pane { PaneId::Tab => &mut self.tabs[self.active], PaneId::Pane2 => self.pane2.as_mut().expect("pane2"), } } fn draw_table(&mut self, ui: &mut egui::Ui, pane: PaneId, entries: &[FileEntry], selected: &BTreeSet<usize>, focus: Option<usize>,) { let mut sort_clicked: Option<SortBy> = None; let mut open_path: Option<PathBuf> = None; let mut select_action: Option<SelectAction> = None; let mut cmd: Option<Command> = None; let (sort_by, sort_desc) = { let t = match pane { PaneId::Tab => &self.tabs[self.active], PaneId::Pane2 => self.pane2.as_ref().unwrap(), }; (t.sort_by, t.sort_desc) }; let row_h = 22.0 * self.config.row_height_scale; let num_rows = entries.len().max(1); let scroll_to = self.scroll_to_row.take(); let egui_ctx = ui.ctx().clone(); egui_extras::TableBuilder::new(ui).striped(true).resizable(true).cell_layout(egui::Layout::left_to_right(egui::Align::Center)).column(egui_extras::Column::auto().at_least(280.0).resizable(true)).column(egui_extras::Column::auto().at_least(90.0)).column(egui_extras::Column::auto().at_least(140.0)).column(egui_extras::Column::remainder().at_least(70.0)).auto_shrink([false, false]).vscroll(true).header(24.0, |mut header| { header.col(|ui| { let label = header_label("名前", sort_by == SortBy::Name, sort_desc); if ui.selectable_label(false, label).clicked() { sort_clicked = Some(SortBy::Name); } }); header.col(|ui| { let label = header_label("サイズ", sort_by == SortBy::Size, sort_desc); if ui.selectable_label(false, label).clicked() { sort_clicked = Some(SortBy::Size); } }); header.col(|ui| { let label = header_label("更新日時", sort_by == SortBy::Modified, sort_desc); if ui.selectable_label(false, label).clicked() { sort_clicked = Some(SortBy::Modified); } }); header.col(|ui| { let label = header_label("種類", sort_by == SortBy::Type, sort_desc); if ui.selectable_label(false, label).clicked() { sort_clicked = Some(SortBy::Type); } }); }).body(|body| { if entries.is_empty() { body.rows(row_h, 1, |mut row| { row.col(|ui| { ui.label("（空のフォルダ）"); }); row.col(|ui| { ui.label("-"); }); row.col(|ui| { ui.label("-"); }); row.col(|ui| { ui.label("-"); }); }); return; } body.rows(row_h, num_rows, |mut row| { let idx = row.index(); let Some(entry) = entries.get(idx) else { return; }; let is_sel = selected.contains(&idx); let is_focus = focus == Some(idx); if scroll_to == Some(idx) { row.set_selected(true); } let tex = self.get_or_load_icon(&egui_ctx, &entry.path, entry.is_dir); let emoji = shell::icon_emoji_for_path(&entry.path, entry.is_dir).to_string(); row.col(|ui| { if is_focus && !is_sel { let rect = ui.max_rect(); ui.painter().rect_stroke(rect, 0.0, egui::Stroke::new(1.0_f32, egui::Color32::from_rgb(80, 160, 255)),); } let ctrl = ui.input(|i| i.modifiers.command || i.modifiers.ctrl); let shift = ui.input(|i| i.modifiers.shift); ui.horizontal(|ui| { if let Some(t) = tex.clone() { ui.image(egui::ImageSource::Texture(egui::load::SizedTexture::new(t.id(), egui::vec2(16.0, 16.0),))); } else { ui.label(emoji.clone()); } let label = entry.name.clone(); let resp = ui.selectable_label(is_sel, label); if resp.clicked() { if ctrl { select_action = Some(SelectAction::Toggle(idx)); } else if shift { select_action = Some(SelectAction::Range(idx)); } else { select_action = Some(SelectAction::Only(idx)); } } if resp.double_clicked() { select_action = Some(SelectAction::Only(idx)); if entry.is_dir { open_path = Some(entry.path.clone()); } else { let _ = shell::open_with_shell(&entry.path); } } if resp.secondary_clicked() && !selected.contains(&idx) { select_action = Some(SelectAction::Only(idx)); } resp.context_menu(|ui| { if ui.button("開く").clicked() { if entry.is_dir { open_path = Some(entry.path.clone()); } else { let _ = shell::open_with_shell(&entry.path); } ui.close_menu(); } if ui.button("Explorerで表示").clicked() { let _ = shell::reveal_in_explorer(&entry.path); ui.close_menu(); } if ui.button("パスをコピー").clicked() { ui.output_mut(|o| { o.copied_text = entry.path.display().to_string() }); ui.close_menu(); } if ui.button("名前をコピー").clicked() { ui.output_mut(|o| o.copied_text = entry.name.clone()); ui.close_menu(); } ui.separator(); if ui.button("コピー (Ctrl+C)").clicked() { cmd = Some(Command::Copy); ui.close_menu(); } if ui.button("切り取り (Ctrl+X)").clicked() { cmd = Some(Command::Cut); ui.close_menu(); } if ui.button("貼り付け (Ctrl+V)").clicked() { cmd = Some(Command::Paste); ui.close_menu(); } ui.separator(); if ui.button("名前変更 (F2)").clicked() { cmd = Some(Command::Rename); ui.close_menu(); } if ui.button("ごみ箱へ (Del)").clicked() { cmd = Some(Command::Delete { permanent: false }); ui.close_menu(); } if ui.button("完全削除 (Shift+Del)").clicked() { cmd = Some(Command::Delete { permanent: true }); ui.close_menu(); } ui.separator(); if ui.button("新しいフォルダ").clicked() { cmd = Some(Command::NewFolder); ui.close_menu(); } if ui.button("全選択 (Ctrl+A)").clicked() { cmd = Some(Command::SelectAll); ui.close_menu(); } if ui.button("選択を反転 (Ctrl+I)").clicked() { cmd = Some(Command::InvertSelection); ui.close_menu(); } }); }); }); row.col(|ui| { ui.label(if entry.is_dir { "-".into() } else { fs_ops::humansize(entry.size) }); }); row.col(|ui| { ui.label(fs_ops::fmt_time(entry.modified)); }); row.col(|ui| { if let Some(t) = shell::os_type_name(&entry.path) { ui.label(t); } else { ui.label(&entry.ext); } }); }); }); if let Some(s) = sort_clicked { let t = self.tab_for_mut(pane); if t.sort_by == s { t.sort_desc = !t.sort_desc; } else { t.sort_by = s; t.sort_desc = false; } t.sort(); } if let Some(a) = select_action { self.active_pane = match pane { PaneId::Tab => 0, PaneId::Pane2 => 1, }; let t = self.tab_for_mut(pane); match a { SelectAction::Only(i) => t.select_only(i), SelectAction::Toggle(i) => t.toggle_select(i), SelectAction::Range(i) => t.select_range_to(i), } self.sync_address(); self.update_preview(); } if let Some(p) = open_path { self.active_pane = match pane { PaneId::Tab => 0, PaneId::Pane2 => 1, }; self.tab_for_mut(pane).navigate_to(p); self.sync_address(); self.note_navigation(); self.sync_watchers(); self.update_preview(); } if let Some(c) = cmd { self.active_pane = match pane { PaneId::Tab => 0, PaneId::Pane2 => 1, }; self.run_command(c); } } } enum SelectAction { Only(usize), Toggle(usize), Range(usize), } fn header_label(base: &str, active: bool, desc: bool) -> String { if !active { return base.to_string(); } if desc { format!("{base} ▼") } else { format!("{base} ▲") } }
