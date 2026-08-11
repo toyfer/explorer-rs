@@ -12,9 +12,11 @@
 - 存在しないパス入力時は `status = "見つかりません: ..."` を表示し、クラッシュしない。
 - 存在するファイルパス入力時は `shell::open_with_shell`、ディレクトリは `navigate_to` + `note_navigation` + `sync_watchers`。
 
-## 実装方針（後で対応）
-- `TopBar` の `resp.has_focus()` ガードを維持しつつ、`ui.input(|i| i.key_pressed(Enter))` を `ctx.input` ではなく `resp.has_focus()` 直後の `ui.input` で判定。
-- 他の `TextEdit` が `has_focus()` を持つ場合は早期 return。
+## 実装方針（Context7 egui）
+- `egui::Response::has_focus()` はウィジェット単位のフォーカス。`Context::wants_keyboard_input()` はどのTextEditでもtrueなので粗すぎる — `resp.has_focus()` で厳密に判定する。
+- `egui-winit` は `winit::KeyEvent` を `Event::Key` と `Event::Text` に分岐してpushする。IME確定の日本語は `Text` として来るため `Key::Enter` と混同しない。
+- `TopBar` の `resp.has_focus()` ガードを維持しつつ、`ui.input(|i| i.key_pressed(Enter))` を `resp.has_focus()` とANDで判定。他の `TextEdit` が `has_focus()` を持つ場合は早期return。
+- `egui 0.35` の `lost_focus` 修正と `owns_ime_events` 改善を踏まえ、フォーカス移動の中途半端なフレームでも `has_focus` が安定する。
 - テスト: `normalize_path_input` が `/` と `\` を正規化する既存テストに加え、`address="C:/tmp"` → Enter → `current == "C:\tmp"` を GHA Windows で検証。
 - レジストリ非使用・ポータブル config に影響なし。
 
@@ -24,4 +26,4 @@
 - [ ] IME 確定 Enter で誤遷移しない
 - [ ] GHA `cargo test` 緑
 
-> 本 PR は説明のみ。実装は後続コミットで対応。
+> 実装済み: `src/app.rs` TopBarで `resp.has_focus() && enter_pressed` を厳格化。Context7 `Response::has_focus` / `egui-winit Text/Key split` 準拠。
