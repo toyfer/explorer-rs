@@ -96,14 +96,32 @@ pub fn apply_fonts(ctx: &eframe::egui::Context, config: &AppConfig) -> String {
         if has_custom { list.insert(0, CUSTOM_FONT_KEY.to_owned()); }
     }
     ctx.set_fonts(fonts);
+
+    // Context7 (egui FullOutput / Context::tessellate):
+    // pixels_per_point is used for feathering (anti-aliasing) when Tessellator::new(...)
+    // builds triangle meshes. Ensure feathering is on so CJK glyphs at ~14pt are less jagged.
+    // Do NOT call set_pixels_per_point here — eframe already follows the OS scale factor.
+    // See: https://github.com/emilk/egui/blob/main/crates/egui/src/data/output.rs
+    ctx.tessellation_options_mut(|o| {
+        o.feathering = true;
+    });
+
     apply_text_styles(ctx, config.font_size);
-    format!("フォント: {loaded_name}")
+    format!("フォント: {loaded_name} (ppp={:.2})", ctx.pixels_per_point())
 }
 
 pub fn apply_text_styles(ctx: &eframe::egui::Context, size: f32) {
     let size = size.clamp(10.0, 28.0);
     let mut style = (*ctx.style()).clone();
-    style.text_styles = [ (TextStyle::Small, FontId::new((size*0.85).max(9.0), FontFamily::Proportional)), (TextStyle::Body, FontId::new(size, FontFamily::Proportional)), (TextStyle::Button, FontId::new(size, FontFamily::Proportional)), (TextStyle::Heading, FontId::new(size*1.35, FontFamily::Proportional)), (TextStyle::Monospace, FontId::new(size, FontFamily::Monospace)), ].into();
+    // Context7: Style::text_styles is BTreeMap<TextStyle, FontId>; keep Body/Button aligned with font_size.
+    style.text_styles = [
+        (TextStyle::Small, FontId::new((size * 0.85).max(9.0), FontFamily::Proportional)),
+        (TextStyle::Body, FontId::new(size, FontFamily::Proportional)),
+        (TextStyle::Button, FontId::new(size, FontFamily::Proportional)),
+        (TextStyle::Heading, FontId::new(size * 1.35, FontFamily::Proportional)),
+        (TextStyle::Monospace, FontId::new(size, FontFamily::Monospace)),
+    ]
+    .into();
     style.interaction.selectable_labels = false;
     ctx.set_style(style);
 }
