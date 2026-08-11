@@ -1,0 +1,281 @@
+   Compiling explorer-rs v0.1.4 (D:\a\explorer-rs\explorer-rs)
+warning: manual `Range::contains` implementation
+   --> build.rs:104:28
+    |
+104 |     let is_tab = ty < 6 && x >= 2 && x < 14;
+    |                            ^^^^^^^^^^^^^^^^ help: use: `(2..14).contains(&x)`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.97.0/index.html#manual_range_contains
+    = note: `-W clippy::manual-range-contains` implied by `-W clippy::all`
+    = help: to override `-W clippy::all` add `#[allow(clippy::manual_range_contains)]`
+
+warning: manual `Range::contains` implementation
+   --> build.rs:105:41
+    |
+105 |     let is_body = ty >= 6 && ty < 28 && x >= 2 && x < 30;
+    |                                         ^^^^^^^^^^^^^^^^ help: use: `(2..30).contains(&x)`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.97.0/index.html#manual_range_contains
+
+warning: manual `Range::contains` implementation
+   --> build.rs:105:19
+    |
+105 |     let is_body = ty >= 6 && ty < 28 && x >= 2 && x < 30;
+    |                   ^^^^^^^^^^^^^^^^^^ help: use: `(6..28).contains(&ty)`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.97.0/index.html#manual_range_contains
+
+warning: manual `Range::contains` implementation
+   --> build.rs:114:36
+    |
+114 |         if ty >= 12 && ty <= 13 && x >= 6 && x < 26 { return (255, 255, 255, 230); }
+    |                                    ^^^^^^^^^^^^^^^^ help: use: `(6..26).contains(&x)`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.97.0/index.html#manual_range_contains
+
+warning: manual `RangeInclusive::contains` implementation
+   --> build.rs:114:12
+    |
+114 |         if ty >= 12 && ty <= 13 && x >= 6 && x < 26 { return (255, 255, 255, 230); }
+    |            ^^^^^^^^^^^^^^^^^^^^ help: use: `(12..=13).contains(&ty)`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.97.0/index.html#manual_range_contains
+
+warning: manual `Range::contains` implementation
+   --> build.rs:115:36
+    |
+115 |         if ty >= 16 && ty <= 17 && x >= 6 && x < 26 { return (255, 255, 255, 230); }
+    |                                    ^^^^^^^^^^^^^^^^ help: use: `(6..26).contains(&x)`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.97.0/index.html#manual_range_contains
+
+warning: manual `RangeInclusive::contains` implementation
+   --> build.rs:115:12
+    |
+115 |         if ty >= 16 && ty <= 17 && x >= 6 && x < 26 { return (255, 255, 255, 230); }
+    |            ^^^^^^^^^^^^^^^^^^^^ help: use: `(16..=17).contains(&ty)`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.97.0/index.html#manual_range_contains
+
+warning: manual `Range::contains` implementation
+   --> build.rs:116:36
+    |
+116 |         if ty >= 20 && ty <= 21 && x >= 6 && x < 20 { return (255, 255, 255, 230); }
+    |                                    ^^^^^^^^^^^^^^^^ help: use: `(6..20).contains(&x)`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.97.0/index.html#manual_range_contains
+
+warning: manual `RangeInclusive::contains` implementation
+   --> build.rs:116:12
+    |
+116 |         if ty >= 20 && ty <= 21 && x >= 6 && x < 20 { return (255, 255, 255, 230); }
+    |            ^^^^^^^^^^^^^^^^^^^^ help: use: `(20..=21).contains(&ty)`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.97.0/index.html#manual_range_contains
+
+warning: `explorer-rs` (build script) generated 9 warnings
+warning: explorer-rs@0.1.4: embedded icon D:\a\explorer-rs\explorer-rs\target\debug\build\explorer-rs-8101302ed1f8e39f\out\generated_icon.ico
+warning: variable does not need to be mutable
+   --> src\shell.rs:209:13
+    |
+209 |         let mut width = bm.bmWidth;
+    |             ----^^^^^
+    |             |
+    |             help: remove this `mut`
+    |
+    = note: `#[warn(unused_mut)]` (part of `#[warn(unused)]`) on by default
+
+warning: variants `CopyName` and `FocusFilter` are never constructed
+  --> src\commands.rs:29:5
+   |
+10 | pub enum Command {
+   |          ------- variants in this enum
+...
+29 |     CopyName,
+   |     ^^^^^^^^
+...
+37 |     FocusFilter,
+   |     ^^^^^^^^^^^
+   |
+   = note: `Command` has derived impls for the traits `Clone` and `Debug`, but these are intentionally ignored during dead code analysis
+   = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: field `ok` is never read
+  --> src\commands.rs:44:17
+   |
+44 |     PasteDone { ok: usize, err: usize, message: String },
+   |     ---------   ^^
+   |     |
+   |     field in this variant
+   |
+   = note: `BgEvent` has a derived impl for the trait `Debug`, but this is intentionally ignored during dead code analysis
+
+warning: function `normalize_path_input` is never used
+  --> src\fs_ops.rs:88:8
+   |
+88 | pub fn normalize_path_input(input: &str) -> PathBuf {
+   |        ^^^^^^^^^^^^^^^^^^^^
+
+warning: function `selected_total_size` is never used
+   --> src\fs_ops.rs:170:8
+    |
+170 | pub fn selected_total_size<'a, I>(entries: I) -> u64
+    |        ^^^^^^^^^^^^^^^^^^^
+
+warning: function `is_dir_via_attr` is never used
+   --> src\shell.rs:110:12
+    |
+110 |     pub fn is_dir_via_attr(path: &Path) -> bool {
+    |            ^^^^^^^^^^^^^^^
+
+warning: function `show_os_context_menu` is never used
+   --> src\shell.rs:129:12
+    |
+129 |     pub fn show_os_context_menu(_paths: &[PathBuf]) -> anyhow::Result<()> {
+    |            ^^^^^^^^^^^^^^^^^^^^
+
+warning: method `navigate_to_async` is never used
+   --> src\tab.rs:225:12
+    |
+ 84 | impl Tab {
+    | -------- method in this implementation
+...
+225 |     pub fn navigate_to_async(&mut self, path: PathBuf) -> bool {
+    |            ^^^^^^^^^^^^^^^^^
+
+warning: this function has too many arguments (8/7)
+   --> src\commands.rs:96:1
+    |
+ 96 | / pub fn spawn_list(
+ 97 | |     tx: BgSender,
+ 98 | |     generation: u64,
+ 99 | |     is_pane2: bool,
+...   |
+104 | |     sort_desc: bool,
+105 | | ) {
+    | |_^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.97.0/index.html#too_many_arguments
+    = note: `-W clippy::too-many-arguments` implied by `-W clippy::all`
+    = help: to override `-W clippy::all` add `#[allow(clippy::too_many_arguments)]`
+
+warning: comparing with null is better expressed by the `.is_null()` method
+   --> src\shell.rs:196:51
+    |
+196 |         let is_color = !hbm_color.is_invalid() && hbm_color.0 != std::ptr::null_mut();
+    |                                                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: try: `!hbm_color.0.is_null()`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.97.0/index.html#cmp_null
+    = note: `-W clippy::cmp-null` implied by `-W clippy::all`
+    = help: to override `-W clippy::all` add `#[allow(clippy::cmp_null)]`
+
+warning: writing `&mut Vec` instead of `&mut [_]` involves a new object where a slice will do
+   --> src\tab.rs:132:34
+    |
+132 |     pub fn sort_entries(entries: &mut Vec<FileEntry>, sort_by: SortBy, sort_desc: bool) {
+    |                                  ^^^^^^^^^^^^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.97.0/index.html#ptr_arg
+    = note: `-W clippy::ptr-arg` implied by `-W clippy::all`
+    = help: to override `-W clippy::all` add `#[allow(clippy::ptr_arg)]`
+help: change this to
+    |
+132 -     pub fn sort_entries(entries: &mut Vec<FileEntry>, sort_by: SortBy, sort_desc: bool) {
+132 +     pub fn sort_entries(entries: &mut [FileEntry], sort_by: SortBy, sort_desc: bool) {
+    |
+
+warning: `anchor` is never smaller than `0` and has therefore no effect
+   --> src\tab.rs:409:22
+    |
+409 |             let lo = anchor.min(0);
+    |                      ^^^^^^^^^^^^^ help: try: `0`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.97.0/index.html#unnecessary_min_or_max
+    = note: `-W clippy::unnecessary-min-or-max` implied by `-W clippy::all`
+    = help: to override `-W clippy::all` add `#[allow(clippy::unnecessary_min_or_max)]`
+
+warning: `anchor` is never smaller than `0` and has therefore no effect
+   --> src\tab.rs:410:22
+    |
+410 |             let hi = anchor.max(0);
+    |                      ^^^^^^^^^^^^^ help: try: `anchor`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.97.0/index.html#unnecessary_min_or_max
+
+warning: manual `Range::contains` implementation
+  --> src\main.rs:74:27
+   |
+74 |     let is_tab = y < 6 && x >= 2 && x < 14;
+   |                           ^^^^^^^^^^^^^^^^ help: use: `(2..14).contains(&x)`
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.97.0/index.html#manual_range_contains
+   = note: `-W clippy::manual-range-contains` implied by `-W clippy::all`
+   = help: to override `-W clippy::all` add `#[allow(clippy::manual_range_contains)]`
+
+warning: manual `Range::contains` implementation
+  --> src\main.rs:75:39
+   |
+75 |     let is_body = y >= 6 && y < 28 && x >= 2 && x < 30;
+   |                                       ^^^^^^^^^^^^^^^^ help: use: `(2..30).contains(&x)`
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.97.0/index.html#manual_range_contains
+
+warning: manual `Range::contains` implementation
+  --> src\main.rs:75:19
+   |
+75 |     let is_body = y >= 6 && y < 28 && x >= 2 && x < 30;
+   |                   ^^^^^^^^^^^^^^^^ help: use: `(6..28).contains(&y)`
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.97.0/index.html#manual_range_contains
+
+warning: manual `Range::contains` implementation
+  --> src\main.rs:87:34
+   |
+87 |         if y >= 12 && y <= 13 && x >= 6 && x < 26 {
+   |                                  ^^^^^^^^^^^^^^^^ help: use: `(6..26).contains(&x)`
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.97.0/index.html#manual_range_contains
+
+warning: manual `RangeInclusive::contains` implementation
+  --> src\main.rs:87:12
+   |
+87 |         if y >= 12 && y <= 13 && x >= 6 && x < 26 {
+   |            ^^^^^^^^^^^^^^^^^^ help: use: `(12..=13).contains(&y)`
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.97.0/index.html#manual_range_contains
+
+warning: manual `Range::contains` implementation
+  --> src\main.rs:90:34
+   |
+90 |         if y >= 16 && y <= 17 && x >= 6 && x < 26 {
+   |                                  ^^^^^^^^^^^^^^^^ help: use: `(6..26).contains(&x)`
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.97.0/index.html#manual_range_contains
+
+warning: manual `RangeInclusive::contains` implementation
+  --> src\main.rs:90:12
+   |
+90 |         if y >= 16 && y <= 17 && x >= 6 && x < 26 {
+   |            ^^^^^^^^^^^^^^^^^^ help: use: `(16..=17).contains(&y)`
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.97.0/index.html#manual_range_contains
+
+warning: manual `Range::contains` implementation
+  --> src\main.rs:93:34
+   |
+93 |         if y >= 20 && y <= 21 && x >= 6 && x < 20 {
+   |                                  ^^^^^^^^^^^^^^^^ help: use: `(6..20).contains(&x)`
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.97.0/index.html#manual_range_contains
+
+warning: manual `RangeInclusive::contains` implementation
+  --> src\main.rs:93:12
+   |
+93 |         if y >= 20 && y <= 21 && x >= 6 && x < 20 {
+   |            ^^^^^^^^^^^^^^^^^^ help: use: `(20..=21).contains(&y)`
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.97.0/index.html#manual_range_contains
+
+warning: `explorer-rs` (bin "explorer-rs") generated 22 warnings (2 duplicates) (run `cargo clippy --fix --bin "explorer-rs" -p explorer-rs -- -W clippy::all` to apply 11 suggestions)
+warning: `explorer-rs` (bin "explorer-rs" test) generated 20 warnings (18 duplicates) (run `cargo clippy --fix --bin "explorer-rs" -p explorer-rs --tests -- -W clippy::all` to apply 2 suggestions)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 3.26s
