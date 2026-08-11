@@ -86,12 +86,53 @@ impl Default for AppConfig {
 }
 
 impl AppConfig {
-    fn path() -> Option<PathBuf> {
+    /// Portable config path: same directory as executable (or current dir).
+    /// No registry, no APPDATA pollution.
+    fn portable_path() -> Option<PathBuf> {
+        // 1. exe directory: e.g. C:\Tools\explorer-rs\config.json
+        if let Ok(exe) = std::env::current_exe() {
+            if let Some(dir) = exe.parent() {
+                // Prefer exe dir if writable or already exists
+                let p = dir.join("config.json");
+                return Some(p);
+            }
+        }
+        // 2. current dir fallback (for cargo run / dev)
+        if let Ok(cur) = std::env::current_dir() {
+            return Some(cur.join("config.json"));
+        }
+        None
+    }
+
+    /// Legacy path for migration (previous APPDATA location)
+    fn legacy_path() -> Option<PathBuf> {
         dirs::config_dir().map(|p| p.join("explorer-rs").join("config.json"))
     }
 
+    fn path() -> Option<PathBuf> {
+        // Always prefer portable; no registry/AppData writes
+        Self::portable_path().or_else(Self::legacy_path)
+    }
+
+    /// Resolve the actual file to load: portable first, then legacy for migration
+    fn load_path() -> Option<PathBuf> {
+        if let Some(p) = Self::portable_path() {
+            if p.exists() {
+                return Some(p);
+            }
+        }
+        // Fallback to legacy if portable doesn't exist yet (one-time migration)
+        if let Some(p) = Self::legacy_path() {
+            if p.exists() {
+                return Some(p);
+            }
+        }
+        // No existing file: use portable for new installs
+        Self::portable_path()
+    }
+
     pub fn load() -> Self {
-        if let Some(p) = Self::path() {
+        if let Some(p) = Self::load_path() {
             if let Ok(s) = std::fs::read_to_string(&p) {
                 if let Ok(mut c) = serde_json::from_str::<AppConfig>(&s) {
                     if c.font_size < 10.0 || c.font_size > 28.0 {
@@ -100,10 +141,8 @@ impl AppConfig {
                     if c.row_height_scale < 0.8 || c.row_height_scale > 1.5 {
                         c.row_height_scale = 1.0;
                     }
-                    // Keep existing directories only, preserving most-recent order.
                     let mut seen = std::collections::HashSet::new();
-                    c.recent_paths
-                        .retain(|p| p.is_dir() && seen.insert(p.clone()));
+                    c.recent_paths.retain(|p| p.is_dir() && seen.insert(p.clone()));
                     c.recent_paths.truncate(MAX_RECENT);
                     return c;
                 }
@@ -111,38 +150,23 @@ impl AppConfig {
         }
         let mut c = Self::default();
         if let Some(home) = dirs::home_dir() {
-            c.bookmarks.push(Bookmark {
-                name: "ホーム".into(),
-                path: home,
-            });
+            c.bookmarks.push(Bookmark { name: "ホーム".into(), path: home });
         }
         if let Some(d) = dirs::desktop_dir() {
-            c.bookmarks.push(Bookmark {
-                name: "デスクトップ".into(),
-                path: d,
-            });
+            c.bookmarks.push(Bookmark { name: "デスクトップ".into(), path: d });
         }
         if let Some(d) = dirs::document_dir() {
-            c.bookmarks.push(Bookmark {
-                name: "ドキュメント".into(),
-                path: d,
-            });
+            c.bookmarks.push(Bookmark { name: "ドキュメント".into(), path: d });
         }
         if let Some(d) = dirs::download_dir() {
-            c.bookmarks.push(Bookmark {
-                name: "ダウンロード".into(),
-                path: d,
-            });
+            c.bookmarks.push(Bookmark { name: "ダウンロード".into(), path: d });
         }
         #[cfg(windows)]
         {
             for d in ["C:\\", "D:\\", "E:\\"] {
                 let p = PathBuf::from(d);
                 if p.exists() && !c.bookmarks.iter().any(|b| b.path == p) {
-                    c.bookmarks.push(Bookmark {
-                        name: d.into(),
-                        path: p,
-                    });
+                    c.bookmarks.push(Bookmark { name: d.into(), path: p });
                 }
             }
         }
@@ -151,13 +175,22 @@ impl AppConfig {
 
     pub fn save(&self) -> Result<(), String> {
         let p = Self::path().ok_or_else(|| "設定ディレクトリを解決できません".to_string())?;
-        let parent = p
-            .parent()
-            .ok_or_else(|| "設定パスが不正です".to_string())?;
-        std::fs::create_dir_all(parent).map_err(|e| format!("設定フォルダ作成失敗: {e}"))?;
+        if let Some(parent) = p.parent() {
+            if !parent.as_os_str().is_empty() {
+                std::fs::create_dir_all(parent).map_err(|e| format!("設定フォルダ作成失敗: {e}"))?;
+            }
+        }
         let s = serde_json::to_string_pretty(self).map_err(|e| format!("設定シリアライズ失敗: {e}"))?;
-        std::fs::write(&p, s).map_err(|e| format!("設定書き込み失敗: {e}"))?;
+        // Atomic write via temp file to avoid corrupting portable config
+        let tmp = p.with_extension("json.tmp");
+        std::fs::write(&tmp, &s).map_err(|e| format!("設定書き込み失敗: {e}"))?;
+        std::fs::rename(&tmp, &p).map_err(|e| format!("設定書き込み失敗: {e}"))?;
         Ok(())
+    }
+
+    /// Public helper for tests/docs: where config will be saved
+    pub fn resolved_path() -> Option<PathBuf> {
+        Self::path()
     }
 
     /// Push a directory to the front of recent_paths (deduped, capped).
@@ -189,10 +222,7 @@ mod tests {
     fn roundtrip_json() {
         let c = AppConfig {
             last_path: Some(PathBuf::from("/tmp")),
-            bookmarks: vec![Bookmark {
-                name: "t".into(),
-                path: PathBuf::from("/tmp"),
-            }],
+            bookmarks: vec![Bookmark { name: "t".into(), path: PathBuf::from("/tmp") }],
             recent_paths: vec![PathBuf::from("/tmp")],
             show_hidden: true,
             show_preview: false,
@@ -231,11 +261,18 @@ mod tests {
     #[test]
     fn push_recent_dedupes_and_caps() {
         let mut c = AppConfig::default();
-        // Use temp dirs that exist
         let base = std::env::temp_dir();
         c.push_recent(base.clone());
         c.push_recent(base.clone());
         assert_eq!(c.recent_paths.len(), 1);
         assert_eq!(c.recent_paths[0], base);
+    }
+
+    #[test]
+    fn portable_path_is_preferred() {
+        let p = AppConfig::portable_path();
+        assert!(p.is_some());
+        let s = p.unwrap().to_string_lossy().to_string();
+        assert!(s.ends_with("config.json"));
     }
 }
