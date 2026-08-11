@@ -1,0 +1,119 @@
+   Compiling explorer-rs v0.1.4 (D:\a\explorer-rs\explorer-rs)
+warning: manual `Range::contains` implementation
+   --> build.rs:104:28
+    |
+104 |     let is_tab = ty < 6 && x >= 2 && x < 14;
+    |                            ^^^^^^^^^^^^^^^^ help: use: `(2..14).contains(&x)`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.97.0/index.html#manual_range_contains
+    = note: `-W clippy::manual-range-contains` implied by `-W clippy::all`
+    = help: to override `-W clippy::all` add `#[allow(clippy::manual_range_contains)]`
+
+warning: manual `Range::contains` implementation
+   --> build.rs:105:41
+    |
+105 |     let is_body = ty >= 6 && ty < 28 && x >= 2 && x < 30;
+    |                                         ^^^^^^^^^^^^^^^^ help: use: `(2..30).contains(&x)`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.97.0/index.html#manual_range_contains
+
+warning: manual `Range::contains` implementation
+   --> build.rs:105:19
+    |
+105 |     let is_body = ty >= 6 && ty < 28 && x >= 2 && x < 30;
+    |                   ^^^^^^^^^^^^^^^^^^ help: use: `(6..28).contains(&ty)`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.97.0/index.html#manual_range_contains
+
+warning: manual `Range::contains` implementation
+   --> build.rs:114:36
+    |
+114 |         if ty >= 12 && ty <= 13 && x >= 6 && x < 26 { return (255, 255, 255, 230); }
+    |                                    ^^^^^^^^^^^^^^^^ help: use: `(6..26).contains(&x)`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.97.0/index.html#manual_range_contains
+
+warning: manual `RangeInclusive::contains` implementation
+   --> build.rs:114:12
+    |
+114 |         if ty >= 12 && ty <= 13 && x >= 6 && x < 26 { return (255, 255, 255, 230); }
+    |            ^^^^^^^^^^^^^^^^^^^^ help: use: `(12..=13).contains(&ty)`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.97.0/index.html#manual_range_contains
+
+warning: manual `Range::contains` implementation
+   --> build.rs:115:36
+    |
+115 |         if ty >= 16 && ty <= 17 && x >= 6 && x < 26 { return (255, 255, 255, 230); }
+    |                                    ^^^^^^^^^^^^^^^^ help: use: `(6..26).contains(&x)`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.97.0/index.html#manual_range_contains
+
+warning: manual `RangeInclusive::contains` implementation
+   --> build.rs:115:12
+    |
+115 |         if ty >= 16 && ty <= 17 && x >= 6 && x < 26 { return (255, 255, 255, 230); }
+    |            ^^^^^^^^^^^^^^^^^^^^ help: use: `(16..=17).contains(&ty)`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.97.0/index.html#manual_range_contains
+
+warning: manual `Range::contains` implementation
+   --> build.rs:116:36
+    |
+116 |         if ty >= 20 && ty <= 21 && x >= 6 && x < 20 { return (255, 255, 255, 230); }
+    |                                    ^^^^^^^^^^^^^^^^ help: use: `(6..20).contains(&x)`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.97.0/index.html#manual_range_contains
+
+warning: manual `RangeInclusive::contains` implementation
+   --> build.rs:116:12
+    |
+116 |         if ty >= 20 && ty <= 21 && x >= 6 && x < 20 { return (255, 255, 255, 230); }
+    |            ^^^^^^^^^^^^^^^^^^^^ help: use: `(20..=21).contains(&ty)`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.97.0/index.html#manual_range_contains
+
+warning: `explorer-rs` (build script) generated 9 warnings
+warning: explorer-rs@0.1.4: embedded icon D:\a\explorer-rs\explorer-rs\target\debug\build\explorer-rs-8101302ed1f8e39f\out\generated_icon.ico
+error[E0599]: no method named `ctx` found for struct `egui_extras::TableRow<'a, 'b>` in the current scope
+    --> src\app.rs:2077:57
+     |
+2077 |                     let tex = self.get_or_load_icon(row.ctx(), &entry.path, entry.is_dir);
+     |                                                         ^^^ method not found in `egui_extras::TableRow<'_, '_>`
+
+warning: falling back to `f32` as the trait bound `f32: From<f64>` is not satisfied
+    --> src\app.rs:2085:51
+     |
+2085 | ...                   egui::Stroke::new(1.0, egui::Color32::from_rgb(80, 160, 255)),
+     |                                         ^^^ help: explicitly specify the type as `f32`: `1.0_f32`
+     |
+     = warning: this was previously accepted by the compiler but is being phased out; it will become a hard error in a future release!
+     = note: for more information, see issue #154024 <https://github.com/rust-lang/rust/issues/154024>
+     = note: `#[warn(float_literal_f32_fallback)]` (part of `#[warn(future_incompatible)]`) on by default
+
+warning: variable does not need to be mutable
+    --> src\app.rs:1392:21
+     |
+1392 |                 let mut addr_edit = egui::TextEdit::singleline(&mut self.address)
+     |                     ----^^^^^^^^^
+     |                     |
+     |                     help: remove this `mut`
+     |
+     = note: `#[warn(unused_mut)]` (part of `#[warn(unused)]`) on by default
+
+warning: variable does not need to be mutable
+   --> src\shell.rs:209:13
+    |
+209 |         let mut width = bm.bmWidth;
+    |             ----^^^^^
+    |             |
+    |             help: remove this `mut`
+
+For more information about this error, try `rustc --explain E0599`.
+warning: `explorer-rs` (bin "explorer-rs" test) generated 3 warnings (2 duplicates)
+warning: explorer-rs@0.1.4: embedded icon D:\a\explorer-rs\explorer-rs\target\debug\build\explorer-rs-8101302ed1f8e39f\out\generated_icon.ico
+error: could not compile `explorer-rs` (bin "explorer-rs" test) due to 1 previous error; 3 warnings emitted
+warning: build failed, waiting for other jobs to finish...
+warning: `explorer-rs` (bin "explorer-rs") generated 3 warnings (1 duplicate)
+warning: explorer-rs@0.1.4: embedded icon D:\a\explorer-rs\explorer-rs\target\debug\build\explorer-rs-8101302ed1f8e39f\out\generated_icon.ico
+error: could not compile `explorer-rs` (bin "explorer-rs") due to 1 previous error; 3 warnings emitted
