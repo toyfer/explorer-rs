@@ -1,0 +1,109 @@
+   Compiling explorer-rs v0.1.4 (D:\a\explorer-rs\explorer-rs)
+warning: manual `Range::contains` implementation
+   --> build.rs:104:28
+    |
+104 |     let is_tab = ty < 6 && x >= 2 && x < 14;
+    |                            ^^^^^^^^^^^^^^^^ help: use: `(2..14).contains(&x)`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.97.0/index.html#manual_range_contains
+    = note: `-W clippy::manual-range-contains` implied by `-W clippy::all`
+    = help: to override `-W clippy::all` add `#[allow(clippy::manual_range_contains)]`
+
+warning: manual `Range::contains` implementation
+   --> build.rs:105:41
+    |
+105 |     let is_body = ty >= 6 && ty < 28 && x >= 2 && x < 30;
+    |                                         ^^^^^^^^^^^^^^^^ help: use: `(2..30).contains(&x)`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.97.0/index.html#manual_range_contains
+
+warning: manual `Range::contains` implementation
+   --> build.rs:105:19
+    |
+105 |     let is_body = ty >= 6 && ty < 28 && x >= 2 && x < 30;
+    |                   ^^^^^^^^^^^^^^^^^^ help: use: `(6..28).contains(&ty)`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.97.0/index.html#manual_range_contains
+
+warning: manual `Range::contains` implementation
+   --> build.rs:114:36
+    |
+114 |         if ty >= 12 && ty <= 13 && x >= 6 && x < 26 { return (255, 255, 255, 230); }
+    |                                    ^^^^^^^^^^^^^^^^ help: use: `(6..26).contains(&x)`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.97.0/index.html#manual_range_contains
+
+warning: manual `RangeInclusive::contains` implementation
+   --> build.rs:114:12
+    |
+114 |         if ty >= 12 && ty <= 13 && x >= 6 && x < 26 { return (255, 255, 255, 230); }
+    |            ^^^^^^^^^^^^^^^^^^^^ help: use: `(12..=13).contains(&ty)`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.97.0/index.html#manual_range_contains
+
+warning: manual `Range::contains` implementation
+   --> build.rs:115:36
+    |
+115 |         if ty >= 16 && ty <= 17 && x >= 6 && x < 26 { return (255, 255, 255, 230); }
+    |                                    ^^^^^^^^^^^^^^^^ help: use: `(6..26).contains(&x)`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.97.0/index.html#manual_range_contains
+
+warning: manual `RangeInclusive::contains` implementation
+   --> build.rs:115:12
+    |
+115 |         if ty >= 16 && ty <= 17 && x >= 6 && x < 26 { return (255, 255, 255, 230); }
+    |            ^^^^^^^^^^^^^^^^^^^^ help: use: `(16..=17).contains(&ty)`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.97.0/index.html#manual_range_contains
+
+warning: manual `Range::contains` implementation
+   --> build.rs:116:36
+    |
+116 |         if ty >= 20 && ty <= 21 && x >= 6 && x < 20 { return (255, 255, 255, 230); }
+    |                                    ^^^^^^^^^^^^^^^^ help: use: `(6..20).contains(&x)`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.97.0/index.html#manual_range_contains
+
+warning: manual `RangeInclusive::contains` implementation
+   --> build.rs:116:12
+    |
+116 |         if ty >= 20 && ty <= 21 && x >= 6 && x < 20 { return (255, 255, 255, 230); }
+    |            ^^^^^^^^^^^^^^^^^^^^ help: use: `(20..=21).contains(&ty)`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.97.0/index.html#manual_range_contains
+
+warning: `explorer-rs` (build script) generated 9 warnings
+warning: explorer-rs@0.1.4: embedded icon D:\a\explorer-rs\explorer-rs\target\debug\build\explorer-rs-8101302ed1f8e39f\out\generated_icon.ico
+error[E0502]: cannot borrow `*ui` as immutable because it is also borrowed as mutable
+    --> src\app.rs:2049:19
+     |
+2013 |         egui_extras::TableBuilder::new(ui)
+     |                                        -- mutable borrow occurs here
+...
+2049 |             .body(|body| {
+     |              ---- ^^^^^^ immutable borrow occurs here
+     |              |
+     |              mutable borrow later used by call
+...
+2077 |                     let tex = self.get_or_load_icon(ui.ctx(), &entry.path, entry.is_dir);
+     |                                                     -- second borrow occurs due to use of `*ui` in closure
+
+warning: variable does not need to be mutable
+   --> src\shell.rs:209:13
+    |
+209 |         let mut width = bm.bmWidth;
+    |             ----^^^^^
+    |             |
+    |             help: remove this `mut`
+    |
+    = note: `#[warn(unused_mut)]` (part of `#[warn(unused)]`) on by default
+
+For more information about this error, try `rustc --explain E0502`.
+warning: `explorer-rs` (bin "explorer-rs") generated 1 warning
+warning: explorer-rs@0.1.4: embedded icon D:\a\explorer-rs\explorer-rs\target\debug\build\explorer-rs-8101302ed1f8e39f\out\generated_icon.ico
+error: could not compile `explorer-rs` (bin "explorer-rs") due to 1 previous error; 1 warning emitted
+warning: build failed, waiting for other jobs to finish...
+warning: `explorer-rs` (bin "explorer-rs" test) generated 1 warning (1 duplicate)
+warning: explorer-rs@0.1.4: embedded icon D:\a\explorer-rs\explorer-rs\target\debug\build\explorer-rs-8101302ed1f8e39f\out\generated_icon.ico
+error: could not compile `explorer-rs` (bin "explorer-rs" test) due to 1 previous error; 1 warning emitted
