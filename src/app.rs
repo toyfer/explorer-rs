@@ -573,7 +573,7 @@ impl ExplorerApp {
                 format!("検索中: '{}'", self.typeahead)
             };
             self.preview_text = format!(
-                "場所: {cur}\n\n項目数: {n}\n{free}\n\nヒント:\n• {tip}\n• Ctrl+L アドレス / Ctrl+F 検索\n• Home/End/PgUp/PgDn · Shift+矢印 範囲\n• Ctrl+I 反転 · Ctrl+Shift+C パスコピー\n• Del=ごみ箱 · F10 2ペイン · Ctrl+H 隠し",
+                "場所: {cur}\n\n項目数: {n}\n{free}\n\nヒント:\n• {tip}\n• Ctrl+L アドレス / Ctrl+F 検索\n• Home/End/PgUp/PgDn · Shift+矢印 範囲\n• Ctrl+I 反転 · Ctrl+Shift+C パスコピー\n• Del=ごみ箱 · Shift+Del=完全削除 · F10 2ペイン · Ctrl+H 隠し",
                 cur = cur.display(),
                 tip = tip
             );
@@ -935,6 +935,19 @@ impl ExplorerApp {
             }
             return;
         }
+        // Delete / Shift+Delete: handle before typing guard so permanent delete works even when filter focused
+        {
+            let del_plain = ctx.input_mut(|i| i.consume_key(egui::Modifiers::NONE, egui::Key::Delete));
+            let del_shift = ctx.input_mut(|i| i.consume_key(egui::Modifiers::SHIFT, egui::Key::Delete));
+            if del_plain || del_shift {
+                let permanent = del_shift || ctx.input(|i| i.modifiers.shift);
+                let typing_now = ctx.wants_keyboard_input();
+                if !typing_now || permanent {
+                    self.run_command(Command::Delete { permanent });
+                }
+                // if plain Delete while typing, let TextEdit handle it (don't trigger file delete)
+            }
+        }
         let typing = ctx.wants_keyboard_input();
 
         if ctx.input_mut(|i| i.consume_key(egui::Modifiers::CTRL, egui::Key::L)) {
@@ -1020,10 +1033,6 @@ impl ExplorerApp {
         }
         if ctx.input_mut(|i| i.consume_key(egui::Modifiers::ALT, egui::Key::Home)) {
             self.run_command(Command::GoHome);
-        }
-        if ctx.input_mut(|i| i.consume_key(egui::Modifiers::NONE, egui::Key::Delete)) {
-            let shift = ctx.input(|i| i.modifiers.shift);
-            self.run_command(Command::Delete { permanent: shift });
         }
         if ctx.input_mut(|i| i.consume_key(egui::Modifiers::NONE, egui::Key::Enter)) {
             self.run_command(Command::OpenPrimary);

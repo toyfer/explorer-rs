@@ -134,10 +134,20 @@ pub fn move_path(src: &Path, dst: &Path) -> anyhow::Result<()> {
 }
 
 pub fn trash_paths(paths: &[PathBuf]) -> anyhow::Result<()> {
+    let mut failures = Vec::new();
     for p in paths {
-        trash::delete(p).map_err(|e| anyhow::anyhow!("{e}"))?;
+        if let Err(e) = trash::delete(p) {
+            failures.push(format!("{}: {e}", p.display()));
+        }
     }
-    Ok(())
+    if failures.is_empty() {
+        Ok(())
+    } else {
+        anyhow::bail!(
+            "ごみ箱へ移動できませんでした（ごみ箱が無効/利用不可の可能性。Shift+Delで完全削除を試してください）: {}",
+            failures.join(", ")
+        )
+    }
 }
 
 pub fn permanent_delete(paths: &[PathBuf]) -> anyhow::Result<()> {
