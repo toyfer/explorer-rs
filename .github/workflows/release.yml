@@ -4,12 +4,14 @@ on:
   push:
     tags:
       - 'v*'
+    branches:
+      - main
   workflow_dispatch:
     inputs:
       version:
-        description: 'Release version (e.g. v0.1.0)'
+        description: 'Release version (e.g. v0.1.0) — leave empty to use Cargo.toml'
         required: false
-        default: 'v0.0.0-manual'
+        default: ''
 
 permissions:
   contents: write
@@ -18,13 +20,15 @@ env:
   CARGO_TERM_COLOR: always
   BIN_NAME: explorer-rs
 
-# Windows only: stability + performance + fonts are the only priorities
 jobs:
   build-windows:
     name: Build Windows x86_64 (single binary)
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          fetch-tags: true
 
       - name: Install Rust stable + target
         uses: dtolnay/rust-toolchain@stable
@@ -33,6 +37,51 @@ jobs:
 
       - name: Cache cargo (perf)
         uses: Swatinem/rust-cache@v2
+
+      - name: Resolve version
+        id: version
+        shell: pwsh
+        run: |
+          $cargoVer = ""
+          $m = Select-String -Path Cargo.toml -Pattern '^version\s*=\s*"([^"]+)"'
+          if ($m) { $cargoVer = $m.Matches[0].Groups[1].Value }
+          if (-not $cargoVer) { $cargoVer = "0.0.0" }
+          $shortSha = "${{ github.sha }}".Substring(0,7)
+          $ref = "${{ github.ref }}"
+          $refName = "${{ github.ref_name }}"
+          $inputVer = "${{ inputs.version }}"
+          $resolved = ""
+          $isPrerelease = "false"
+          if ($ref -like "refs/tags/v*") {
+            $resolved = $refName
+            if ($resolved -match "alpha|beta|rc|nightly") { $isPrerelease = "true" }
+          } elseif ("${{ github.event_name }}" -eq "workflow_dispatch" -and $inputVer -ne "") {
+            $resolved = $inputVer
+            if ($resolved -notlike "v*") { $resolved = "v$resolved" }
+            if ($resolved -match "alpha|beta|rc|nightly") { $isPrerelease = "true" }
+          } else {
+            # push to main -> try stable tag v<Cargo.toml> first
+            $candidate = "v$cargoVer"
+            git fetch --tags 2>$null | Out-Null
+            $exists = (git tag -l $candidate)
+            if (-not $exists) {
+              $resolved = $candidate
+            } else {
+              # version already released -> nightly prerelease so every merge still yields an exe
+              $resolved = "v$cargoVer-nightly-$shortSha"
+              $isPrerelease = "true"
+            }
+            # ensure we don't collide with an existing nightly tag (extremely unlikely)
+            $tries = 0
+            while ((git tag -l $resolved) -and $tries -lt 5) {
+              $resolved = "v$cargoVer-nightly-$shortSha-$tries"
+              $tries++
+            }
+          }
+          Write-Host "cargoVer=$cargoVer resolved=$resolved prerelease=$isPrerelease"
+          "version=$resolved" | Out-File -Append $env:GITHUB_OUTPUT -Encoding utf8
+          "cargo_version=$cargoVer" | Out-File -Append $env:GITHUB_OUTPUT -Encoding utf8
+          "prerelease=$isPrerelease" | Out-File -Append $env:GITHUB_OUTPUT -Encoding utf8
 
       - name: Build release (single binary, crt-static, lto)
         run: cargo build --release --verbose
@@ -54,11 +103,8 @@ jobs:
       - name: Create portable zip
         shell: pwsh
         run: |
-          $version = "${{ github.ref_name }}"
-          if ("${{ github.event_name }}" -eq "workflow_dispatch" -and "${{ github.event.inputs.version }}" -ne "") {
-            $version = "${{ github.event.inputs.version }}"
-          }
-          if ($version -eq "" -or $version -eq "main") { $version = "dev" }
+          $version = "${{ steps.version.outputs.version }}"
+          if (-not $version) { $version = "dev" }
           $dist = "dist"
           New-Item -ItemType Directory -Force -Path $dist | Out-Null
           Copy-Item "target/release/${{ env.BIN_NAME }}.exe" "$dist/"
@@ -91,26 +137,27 @@ jobs:
           path: target/release/${{ env.BIN_NAME }}.exe
           retention-days: 30
 
-      - name: Create GitHub Release
-        if: startsWith(github.ref, 'refs/tags/v')
+      - name: Create GitHub Release (auto)
         uses: softprops/action-gh-release@v2
         with:
+          tag_name: ${{ steps.version.outputs.version }}
           files: |
             *.zip
             target/release/${{ env.BIN_NAME }}.exe
           generate_release_notes: true
           draft: false
-          prerelease: ${{ contains(github.ref_name, 'alpha') || contains(github.ref_name, 'beta') || contains(github.ref_name, 'rc') }}
+          prerelease: ${{ steps.version.outputs.prerelease == 'true' }}
           body: |
-            ## explorer-rs ${{ github.ref_name }}
+            ## explorer-rs ${{ steps.version.outputs.version }}
 
-            Windows 向け**単一バイナリ**のポータブル版です。
+            Windows 向け**単一バイナリ**のポータブル版です。（自動リリース）
 
+            - Cargo.toml: `${{ steps.version.outputs.cargo_version }}`
+            - コミット: `${{ github.sha }}`
             - 日本語フォント自動対応（游ゴシック/メイリオ等）、「表示」で変更可能
-            - 安定性・パフォーマンス重視のリリースビルド
 
             ### ダウンロード
-            - `explorer-rs-windows-x86_64-${{ github.ref_name }}.zip` — 推奨
+            - `explorer-rs-windows-x86_64-${{ steps.version.outputs.version }}.zip` — 推奨
             - `explorer-rs.exe` — 単体
 
             ### 使い方
