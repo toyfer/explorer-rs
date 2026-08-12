@@ -1,8 +1,10 @@
+// Context7 wiring for 11c
 #![cfg_attr(windows, windows_subsystem = "windows")]
 
 mod app;
 mod commands;
 mod config;
+mod file_icons;
 mod fonts;
 mod fs_ops;
 mod nat_sort;
