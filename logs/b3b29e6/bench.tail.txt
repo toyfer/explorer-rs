@@ -1,0 +1,100 @@
+   |     ^^^^^^^^
+...
+37 |     FocusFilter,
+   |     ^^^^^^^^^^^
+   |
+   = note: `Command` has derived impls for the traits `Clone` and `Debug`, but these are intentionally ignored during dead code analysis
+   = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: field `ok` is never read
+  --> src\commands.rs:44:17
+   |
+44 |     PasteDone { ok: usize, err: usize, message: String },
+   |     ---------   ^^
+   |     |
+   |     field in this variant
+   |
+   = note: `BgEvent` has a derived impl for the trait `Debug`, but this is intentionally ignored during dead code analysis
+
+warning: associated function `resolved_path` is never used
+   --> src\config.rs:192:12
+    |
+ 88 | impl AppConfig {
+    | -------------- associated function in this implementation
+...
+192 |     pub fn resolved_path() -> Option<PathBuf> {
+    |            ^^^^^^^^^^^^^
+
+warning: function `normalize_path_input` is never used
+  --> src\fs_ops.rs:88:8
+   |
+88 | pub fn normalize_path_input(input: &str) -> PathBuf {
+   |        ^^^^^^^^^^^^^^^^^^^^
+
+warning: function `selected_total_size` is never used
+   --> src\fs_ops.rs:180:8
+    |
+180 | pub fn selected_total_size<'a, I>(entries: I) -> u64
+    |        ^^^^^^^^^^^^^^^^^^^
+
+warning: function `is_dir_via_attr` is never used
+   --> src\shell.rs:110:12
+    |
+110 |     pub fn is_dir_via_attr(path: &Path) -> bool {
+    |            ^^^^^^^^^^^^^^^
+
+warning: function `show_os_context_menu` is never used
+   --> src\shell.rs:129:12
+    |
+129 |     pub fn show_os_context_menu(_paths: &[PathBuf]) -> anyhow::Result<()> {
+    |            ^^^^^^^^^^^^^^^^^^^^
+
+warning: method `navigate_to_async` is never used
+   --> src\tab.rs:225:12
+    |
+ 84 | impl Tab {
+    | -------- method in this implementation
+...
+225 |     pub fn navigate_to_async(&mut self, path: PathBuf) -> bool {
+    |            ^^^^^^^^^^^^^^^^^
+
+warning: struct `FrameTyped` is never constructed
+  --> src\typeahead_input.rs:14:12
+   |
+14 | pub struct FrameTyped {
+   |            ^^^^^^^^^^
+
+warning: enum `TypeaheadAction` is never used
+  --> src\typeahead_input.rs:21:10
+   |
+21 | pub enum TypeaheadAction {
+   |          ^^^^^^^^^^^^^^^
+
+warning: function `collect_frame_typed` is never used
+  --> src\typeahead_input.rs:36:8
+   |
+36 | pub fn collect_frame_typed(ctx: &egui::Context) -> FrameTyped {
+   |        ^^^^^^^^^^^^^^^^^^^
+
+warning: function `should_route_to_filter` is never used
+   --> src\typeahead_input.rs:130:8
+    |
+130 | pub fn should_route_to_filter(wants_keyboard: bool, typed: &str) -> bool {
+    |        ^^^^^^^^^^^^^^^^^^^^^^
+
+warning: function `decide_action` is never used
+   --> src\typeahead_input.rs:138:8
+    |
+138 | pub fn decide_action(
+    |        ^^^^^^^^^^^^^
+
+warning: `explorer-rs` (bin "explorer-rs") generated 14 warnings (run `cargo fix --bin "explorer-rs" -p explorer-rs` to apply 1 suggestion)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 4.90s
+     Running tests\windows_bench.rs (target\debug\deps\windows_bench-501ab3bcba19285f.exe)
+
+running 1 test
+bench_list_5k p50_ms=161.71 p90_ms=165.39 samples=[158.0101, 159.1841, 161.70940000000002, 164.95170000000002, 165.3927]
+test bench_list_5k ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 3.18s
+
