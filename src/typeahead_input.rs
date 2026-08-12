@@ -1,4 +1,4 @@
-//! IME-safe typed input collection for filter / typeahead.
+//! IME-safe typed input for filter / typeahead.
 //!
 //! Context7 (egui-winit):
 //! `on_keyboard_input` pushes `Event::Key` and, for printable text when
@@ -7,12 +7,25 @@
 //! https://github.com/emilk/egui/blob/main/crates/egui-winit/src/lib.rs
 
 use eframe::egui;
+use std::time::{Duration, Instant};
 
 /// Characters typed this frame (Text first, then Key fallback).
 #[derive(Debug, Default, Clone)]
 pub struct FrameTyped {
     pub text: String,
     pub backspace: bool,
+}
+
+/// What the app should do after processing unfocused typing.
+#[derive(Debug, Clone)]
+pub enum TypeaheadAction {
+    None,
+    /// Clear typeahead buffer and optionally set status.
+    ClearTypeahead { status: Option<String> },
+    /// Append to filter, focus filter field, refresh list.
+    RouteToFilter { typed: String },
+    /// Request repaint after timeout check.
+    RepaintAfter(Duration),
 }
 
 /// Collect printable input for the current frame.
@@ -114,11 +127,45 @@ pub fn collect_frame_typed(ctx: &egui::Context) -> FrameTyped {
 }
 
 /// Whether unfocused typing should go to the filter bar (spec B).
-///
-/// When true: append `typed` to `filter`, request Filter focus, refresh list.
-/// When false: either TextEdit owns input, or no printable text this frame.
 pub fn should_route_to_filter(wants_keyboard: bool, typed: &str) -> bool {
     !wants_keyboard && !typed.is_empty()
+}
+
+/// Decide next action for unfocused keyboard input (IME-safe filter unify).
+///
+/// Call only when no dialog owns the UI. Pass `wants_keyboard` from
+/// `ctx.wants_keyboard_input()` — when true, TextEdit owns input.
+pub fn decide_action(
+    wants_keyboard: bool,
+    frame: &FrameTyped,
+    typeahead: &str,
+    typeahead_at: Option<Instant>,
+) -> TypeaheadAction {
+    if wants_keyboard {
+        return TypeaheadAction::None;
+    }
+
+    if frame.backspace && !typeahead.is_empty() {
+        // Caller pops one char; we only signal clear-when-empty via status path.
+        // Prefer filter routing for new input; backspace on legacy typeahead clears.
+        return TypeaheadAction::None;
+    }
+
+    if !frame.text.is_empty() {
+        // Spec B + Context7 Text-first: unfocused printable → filter
+        return TypeaheadAction::RouteToFilter {
+            typed: frame.text.clone(),
+        };
+    }
+
+    if let Some(at) = typeahead_at {
+        if at.elapsed().as_millis() > 1500 {
+            return TypeaheadAction::ClearTypeahead { status: None };
+        }
+        return TypeaheadAction::RepaintAfter(Duration::from_millis(100));
+    }
+
+    TypeaheadAction::None
 }
 
 #[cfg(test)]
@@ -131,5 +178,39 @@ mod tests {
         assert!(should_route_to_filter(false, "a"));
         assert!(!should_route_to_filter(true, "てすと"));
         assert!(!should_route_to_filter(false, ""));
+    }
+
+    #[test]
+    fn decide_routes_ime_text_to_filter() {
+        let frame = FrameTyped {
+            text: "てすと".into(),
+            backspace: false,
+        };
+        match decide_action(false, &frame, "", None) {
+            TypeaheadAction::RouteToFilter { typed } => assert_eq!(typed, "てすと"),
+            other => panic!("expected RouteToFilter, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn decide_defers_when_textedit_focused() {
+        let frame = FrameTyped {
+            text: "あ".into(),
+            backspace: false,
+        };
+        assert!(matches!(
+            decide_action(true, &frame, "", None),
+            TypeaheadAction::None
+        ));
+    }
+
+    #[test]
+    fn decide_clears_stale_typeahead() {
+        let frame = FrameTyped::default();
+        let old = Instant::now() - Duration::from_secs(3);
+        assert!(matches!(
+            decide_action(false, &frame, "x", Some(old)),
+            TypeaheadAction::ClearTypeahead { .. }
+        ));
     }
 }
