@@ -1,4 +1,4 @@
-name: Apply file icons wire
+name: Apply file_icons wire
 
 on:
   push:
@@ -29,6 +29,6 @@ jobs:
           if git diff --staged --quiet; then
             echo "No changes"
           else
-            git commit -m "feat(icons): wire get_or_load_icon to file_icons LRU (Context7)"
+            git commit -m "feat(icons): wire get_or_load_icon via file_icons::load_for_path (Context7 SHGetFileInfo + LRU)"
             git push
           fi
