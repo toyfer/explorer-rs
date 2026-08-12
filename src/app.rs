@@ -358,168 +358,52 @@ impl ExplorerApp {
         None
     }
     fn handle_typeahead(&mut self, ctx: &egui::Context) {
-        if ctx.wants_keyboard_input() {
-            return;
-        }
+        // Context7: Event::Text is primary (IME commit); unfocused printable → filter.
+        // https://github.com/emilk/egui/blob/main/crates/egui-winit/src/lib.rs
         if self.renaming || self.show_new_folder_dialog || self.confirm_delete.is_some() {
             return;
         }
-        let mut backspace_pressed = false;
-        ctx.input(|i| {
-            for ev in &i.events {
-                if let egui::Event::Key {
-                    key: egui::Key::Backspace,
-                    pressed: true,
-                    modifiers,
-                    ..
-                } = ev
-                {
-                    if !modifiers.ctrl && !modifiers.command && !modifiers.alt {
-                        backspace_pressed = true;
-                    }
-                }
-            }
-        });
-        if backspace_pressed && !self.typeahead.is_empty() {
+        let wants = ctx.wants_keyboard_input();
+        let frame = crate::typeahead_input::collect_frame_typed(ctx);
+
+        if frame.backspace && !self.typeahead.is_empty() {
             self.typeahead.pop();
             self.typeahead_at = Some(Instant::now());
             if self.typeahead.is_empty() {
                 self.status = "検索クリア".into();
                 ctx.request_repaint();
-                return;
-            }
-        } else if backspace_pressed {
-            return;
-        }
-        let mut typed = String::new();
-        let mut has_text = false;
-        ctx.input(|i| {
-            for ev in &i.events {
-                if let egui::Event::Text(t) = ev {
-                    if !t.is_empty() && t.chars().all(|c| !c.is_control()) {
-                        typed.push_str(t);
-                        has_text = true;
-                    }
-                }
-            }
-            if !has_text {
-                for ev in &i.events {
-                    if let egui::Event::Key {
-                        key,
-                        pressed: true,
-                        modifiers,
-                        ..
-                    } = ev
-                    {
-                        if modifiers.ctrl || modifiers.command || modifiers.alt {
-                            continue;
-                        }
-                        let ch = match key {
-                            egui::Key::A => 'a',
-                            egui::Key::B => 'b',
-                            egui::Key::C => 'c',
-                            egui::Key::D => 'd',
-                            egui::Key::E => 'e',
-                            egui::Key::F => 'f',
-                            egui::Key::G => 'g',
-                            egui::Key::H => 'h',
-                            egui::Key::I => 'i',
-                            egui::Key::J => 'j',
-                            egui::Key::K => 'k',
-                            egui::Key::L => 'l',
-                            egui::Key::M => 'm',
-                            egui::Key::N => 'n',
-                            egui::Key::O => 'o',
-                            egui::Key::P => 'p',
-                            egui::Key::Q => 'q',
-                            egui::Key::R => 'r',
-                            egui::Key::S => 's',
-                            egui::Key::T => 't',
-                            egui::Key::U => 'u',
-                            egui::Key::V => 'v',
-                            egui::Key::W => 'w',
-                            egui::Key::X => 'x',
-                            egui::Key::Y => 'y',
-                            egui::Key::Z => 'z',
-                            egui::Key::Num0 => '0',
-                            egui::Key::Num1 => '1',
-                            egui::Key::Num2 => '2',
-                            egui::Key::Num3 => '3',
-                            egui::Key::Num4 => '4',
-                            egui::Key::Num5 => '5',
-                            egui::Key::Num6 => '6',
-                            egui::Key::Num7 => '7',
-                            egui::Key::Num8 => '8',
-                            egui::Key::Num9 => '9',
-                            egui::Key::Minus => '-',
-                            egui::Key::Period => '.',
-                            egui::Key::Slash => '/',
-                            egui::Key::Backslash => '\\',
-                            egui::Key::Comma => ',',
-                            _ => continue,
-                        };
-                        typed.push(ch);
-                        has_text = true;
-                    }
-                }
-            }
-        });
-        if typed.is_empty() && !backspace_pressed {
-            if let Some(at) = self.typeahead_at {
-                if at.elapsed().as_millis() > 1500 {
-                    self.clear_typeahead();
-                } else {
-                    ctx.request_repaint_after(std::time::Duration::from_millis(100));
-                }
             }
             return;
         }
-        if !typed.is_empty() {
-            if let Some(at) = self.typeahead_at {
-                if at.elapsed().as_millis() > 1500 {
-                    self.typeahead.clear();
+
+        use crate::typeahead_input::TypeaheadAction;
+        match crate::typeahead_input::decide_action(
+            wants,
+            &frame,
+            &self.typeahead,
+            self.typeahead_at,
+        ) {
+            TypeaheadAction::None => {}
+            TypeaheadAction::ClearTypeahead { status } => {
+                self.clear_typeahead();
+                if let Some(s) = status {
+                    self.status = s;
                 }
             }
-            self.typeahead.push_str(&typed);
-            self.typeahead_at = Some(Instant::now());
-        } else {
-            self.typeahead_at = Some(Instant::now());
-        }
-        let q = self.typeahead.to_lowercase();
-        let entries = self.current_tab().entries.clone();
-        if entries.is_empty() {
-            return;
-        }
-        let start = self.current_tab().focus.map(|f| f + 1).unwrap_or(0);
-        let mut found: Option<usize> = None;
-        for offset in 0..entries.len() {
-            let idx = (start + offset) % entries.len();
-            if entries[idx].name.to_lowercase().starts_with(&q) {
-                found = Some(idx);
-                break;
+            TypeaheadAction::RouteToFilter { typed } => {
+                self.focus_request = Some(FocusTarget::Filter);
+                self.current_tab_mut().filter.push_str(&typed);
+                self.request_refresh_async(false);
+                self.status = format!("フィルタ: '{}'", self.current_tab().filter);
+                self.clear_typeahead();
+                ctx.request_repaint();
+            }
+            TypeaheadAction::RepaintAfter(d) => {
+                ctx.request_repaint_after(d);
             }
         }
-        if found.is_none() {
-            for (idx, e) in entries.iter().enumerate() {
-                if e.name.to_lowercase().contains(&q) {
-                    found = Some(idx);
-                    break;
-                }
-            }
-        }
-        if let Some(idx) = found {
-            self.current_tab_mut().select_only(idx);
-            self.scroll_to_row = Some(idx);
-            self.update_preview();
-            self.status = format!(
-                "インクリメント検索: '{}' → {}",
-                self.typeahead, entries[idx].name
-            );
-        } else {
-            self.status = format!("該当なし: '{}'", self.typeahead);
-        }
-        ctx.request_repaint();
     }
+
     fn update_preview(&mut self) {
         if let Some(entry) = self.current_tab().primary_selected().cloned() {
             if entry.is_dir {
@@ -568,7 +452,7 @@ impl ExplorerApp {
             let free = fs_ops::free_space(&cur).unwrap_or_default();
             let n = self.current_tab().entries.len();
             let tip = if self.typeahead.is_empty() {
-                "文字を入力でインクリメント検索".to_string()
+                "文字を入力でフィルタ".to_string()
             } else {
                 format!("検索中: '{}'", self.typeahead)
             };
