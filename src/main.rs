@@ -8,6 +8,7 @@ mod fs_ops;
 mod nat_sort;
 mod shell;
 mod tab;
+mod toolbar_icons;
 mod typeahead_input;
 mod watch;
 
