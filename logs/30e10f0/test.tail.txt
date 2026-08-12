@@ -1,0 +1,200 @@
+
+warning: variants `CopyName` and `FocusFilter` are never constructed
+  --> src\commands.rs:29:5
+   |
+10 | pub enum Command {
+   |          ------- variants in this enum
+...
+29 |     CopyName,
+   |     ^^^^^^^^
+...
+37 |     FocusFilter,
+   |     ^^^^^^^^^^^
+   |
+   = note: `Command` has derived impls for the traits `Clone` and `Debug`, but these are intentionally ignored during dead code analysis
+   = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: field `ok` is never read
+  --> src\commands.rs:44:17
+   |
+44 |     PasteDone { ok: usize, err: usize, message: String },
+   |     ---------   ^^
+   |     |
+   |     field in this variant
+   |
+   = note: `BgEvent` has a derived impl for the trait `Debug`, but this is intentionally ignored during dead code analysis
+
+warning: associated function `resolved_path` is never used
+   --> src\config.rs:192:12
+    |
+ 88 | impl AppConfig {
+    | -------------- associated function in this implementation
+...
+192 |     pub fn resolved_path() -> Option<PathBuf> {
+    |            ^^^^^^^^^^^^^
+
+warning: struct `CacheKey` is never constructed
+  --> src\file_icons.rs:21:12
+   |
+21 | pub struct CacheKey(pub String);
+   |            ^^^^^^^^
+
+warning: struct `LruIconCache` is never constructed
+  --> src\file_icons.rs:24:12
+   |
+24 | pub struct LruIconCache {
+   |            ^^^^^^^^^^^^
+
+warning: associated items `with_capacity`, `get`, `insert`, `len`, and `cap` are never used
+  --> src\file_icons.rs:31:12
+   |
+30 | impl LruIconCache {
+   | ----------------- associated items in this implementation
+31 |     pub fn with_capacity(cap: usize) -> Self {
+   |            ^^^^^^^^^^^^^
+...
+39 |     pub fn get(&self, key: &CacheKey) -> Option<&egui::TextureHandle> {
+   |            ^^^
+...
+43 |     pub fn insert(&mut self, key: CacheKey, tex: egui::TextureHandle) {
+   |            ^^^^^^
+...
+59 |     pub fn len(&self) -> usize {
+   |            ^^^
+...
+63 |     pub fn cap(&self) -> usize {
+   |            ^^^
+
+warning: function `fallback_svg_bytes` is never used
+  --> src\file_icons.rs:69:8
+   |
+69 | pub fn fallback_svg_bytes(ext: &str, is_dir: bool) -> &'static [u8] {
+   |        ^^^^^^^^^^^^^^^^^^
+
+warning: function `cache_key_for` is never used
+  --> src\file_icons.rs:95:4
+   |
+95 | fn cache_key_for(path: &std::path::Path, is_dir: bool) -> CacheKey {
+   |    ^^^^^^^^^^^^^
+
+warning: function `load_for_path` is never used
+   --> src\file_icons.rs:115:8
+    |
+115 | pub fn load_for_path(
+    |        ^^^^^^^^^^^^^
+
+warning: function `sanitize_for_uri` is never used
+   --> src\file_icons.rs:156:4
+    |
+156 | fn sanitize_for_uri(s: &str) -> String {
+    |    ^^^^^^^^^^^^^^^^
+
+warning: function `svg_bytes_to_texture` is never used
+   --> src\file_icons.rs:168:4
+    |
+168 | fn svg_bytes_to_texture(
+    |    ^^^^^^^^^^^^^^^^^^^^
+
+warning: function `normalize_path_input` is never used
+  --> src\fs_ops.rs:88:8
+   |
+88 | pub fn normalize_path_input(input: &str) -> PathBuf {
+   |        ^^^^^^^^^^^^^^^^^^^^
+
+warning: function `selected_total_size` is never used
+   --> src\fs_ops.rs:180:8
+    |
+180 | pub fn selected_total_size<'a, I>(entries: I) -> u64
+    |        ^^^^^^^^^^^^^^^^^^^
+
+warning: function `is_dir_via_attr` is never used
+   --> src\shell.rs:110:12
+    |
+110 |     pub fn is_dir_via_attr(path: &Path) -> bool {
+    |            ^^^^^^^^^^^^^^^
+
+warning: function `show_os_context_menu` is never used
+   --> src\shell.rs:129:12
+    |
+129 |     pub fn show_os_context_menu(_paths: &[PathBuf]) -> anyhow::Result<()> {
+    |            ^^^^^^^^^^^^^^^^^^^^
+
+warning: method `navigate_to_async` is never used
+   --> src\tab.rs:225:12
+    |
+ 84 | impl Tab {
+    | -------- method in this implementation
+...
+225 |     pub fn navigate_to_async(&mut self, path: PathBuf) -> bool {
+    |            ^^^^^^^^^^^^^^^^^
+
+warning: function `should_route_to_filter` is never used
+   --> src\typeahead_input.rs:130:8
+    |
+130 | pub fn should_route_to_filter(wants_keyboard: bool, typed: &str) -> bool {
+    |        ^^^^^^^^^^^^^^^^^^^^^^
+
+warning: methods `len` and `cap` are never used
+  --> src\file_icons.rs:59:12
+   |
+30 | impl LruIconCache {
+   | ----------------- methods in this implementation
+...
+59 |     pub fn len(&self) -> usize {
+   |            ^^^
+...
+63 |     pub fn cap(&self) -> usize {
+   |            ^^^
+
+warning: `explorer-rs` (bin "explorer-rs" test) generated 12 warnings (11 duplicates)
+warning: `explorer-rs` (bin "explorer-rs") generated 18 warnings (run `cargo fix --bin "explorer-rs" -p explorer-rs` to apply 1 suggestion)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 1m 22s
+     Running `D:\a\explorer-rs\explorer-rs\target\debug\deps\explorer_rs-ce1c1b5ee32b6bd4.exe`
+
+running 30 tests
+test config::tests::default_sort ... ok
+test config::tests::default_font_is_biz_ud_gothic ... ok
+test config::tests::portable_path_is_preferred ... ok
+test config::tests::old_config_without_font_fields_deserializes ... ok
+test file_icons::tests::fallback_svg_nonempty ... ok
+test config::tests::push_recent_dedupes_and_caps ... ok
+test config::tests::roundtrip_json ... ok
+test fs_ops::tests::humansize_basic ... ok
+test fs_ops::tests::normalize_accepts_both_separators ... ok
+test fs_ops::tests::sanitize_rejects_traversal ... ok
+test fs_ops::tests::truncate_chars_safe ... ok
+test nat_sort::tests::case_insensitive_letters ... ok
+test nat_sort::tests::mixed ... ok
+test nat_sort::tests::numbers_in_names ... ok
+test shell::tests::long_path_identity_for_short ... ok
+test shell::tests::normalize_both_separators ... ok
+test shell::tests::normalize_trims ... ok
+test fs_ops::tests::copy_and_move_roundtrip ... ok
+test file_icons::tests::lru_evicts_oldest ... FAILED
+test tab::tests::list_blocking_filters_hidden ... ok
+test tab::tests::move_focus_by_clamps ... ok
+test tab::tests::navigate_async_clears_without_list ... ok
+test toolbar_icons::tests::svg_assets_nonempty ... ok
+test typeahead_input::tests::decide_clears_stale_typeahead ... ok
+test typeahead_input::tests::decide_defers_when_textedit_focused ... ok
+test tab::tests::natural_name_order ... ok
+test tab::tests::multi_select_range ... ok
+test typeahead_input::tests::decide_routes_ime_text_to_filter ... ok
+test typeahead_input::tests::route_to_filter_when_unfocused_and_typed ... ok
+test tab::tests::sort_dirs_first ... ok
+
+failures:
+
+---- file_icons::tests::lru_evicts_oldest stdout ----
+
+thread 'file_icons::tests::lru_evicts_oldest' (8120) panicked at src\file_icons.rs:196:9:
+oldest evicted
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    file_icons::tests::lru_evicts_oldest
+
+test result: FAILED. 29 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+error: test failed, to rerun pass `--bin explorer-rs`
