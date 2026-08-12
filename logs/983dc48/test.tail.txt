@@ -1,0 +1,200 @@
+   Compiling chrono v0.4.45
+     Running `C:\Users\runneradmin\.rustup\toolchains\stable-x86_64-pc-windows-msvc\bin\rustc.exe --crate-name chrono --edition=2021 C:\Users\runneradmin\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\chrono-0.4.45\src\lib.rs --error-format=json --json=diagnostic-rendered-ansi,artifacts,future-incompat --crate-type lib --emit=dep-info,metadata,link -C embed-bitcode=no -C debuginfo=2 --cfg "feature=\"alloc\"" --cfg "feature=\"clock\"" --cfg "feature=\"default\"" --cfg "feature=\"iana-time-zone\"" --cfg "feature=\"js-sys\"" --cfg "feature=\"now\"" --cfg "feature=\"oldtime\"" --cfg "feature=\"std\"" --cfg "feature=\"wasm-bindgen\"" --cfg "feature=\"wasmbind\"" --cfg "feature=\"winapi\"" --cfg "feature=\"windows-link\"" --check-cfg cfg(docsrs,test) --check-cfg "cfg(feature, values(\"__internal_bench\", \"alloc\", \"arbitrary\", \"clock\", \"core-error\", \"default\", \"defmt\", \"iana-time-zone\", \"js-sys\", \"libc\", \"now\", \"oldtime\", \"pure-rust-locales\", \"rkyv\", \"rkyv-16\", \"rkyv-32\", \"rkyv-64\", \"rkyv-validation\", \"serde\", \"std\", \"unstable-locales\", \"wasm-bindgen\", \"wasmbind\", \"winapi\", \"windows-link\"))" -C metadata=03380a10b3ac44a2 -C extra-filename=-7a7e22d69a1818cb --out-dir D:\a\explorer-rs\explorer-rs\target\debug\deps -L dependency=D:\a\explorer-rs\explorer-rs\target\debug\deps --extern num_traits=D:\a\explorer-rs\explorer-rs\target\debug\deps\libnum_traits-440287451f92b0cb.rmeta --extern windows_link=D:\a\explorer-rs\explorer-rs\target\debug\deps\libwindows_link-7550f874b77473f4.rmeta --cap-lints allow`
+   Compiling open v5.4.1
+     Running `C:\Users\runneradmin\.rustup\toolchains\stable-x86_64-pc-windows-msvc\bin\rustc.exe --crate-name open --edition=2018 C:\Users\runneradmin\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\open-5.4.1\src\lib.rs --error-format=json --json=diagnostic-rendered-ansi,artifacts,future-incompat --crate-type lib --emit=dep-info,metadata,link -C embed-bitcode=no -C debuginfo=2 --check-cfg cfg(docsrs,test) --check-cfg "cfg(feature, values(\"insecure\", \"shellexecute-on-windows\"))" -C metadata=e1ee0c15390d3068 -C extra-filename=-e53c158be9dcec02 --out-dir D:\a\explorer-rs\explorer-rs\target\debug\deps -L dependency=D:\a\explorer-rs\explorer-rs\target\debug\deps --cap-lints allow`
+   Compiling trash v4.1.1
+     Running `C:\Users\runneradmin\.rustup\toolchains\stable-x86_64-pc-windows-msvc\bin\rustc.exe --crate-name trash --edition=2021 C:\Users\runneradmin\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\trash-4.1.1\src\lib.rs --error-format=json --json=diagnostic-rendered-ansi,artifacts,future-incompat --crate-type lib --emit=dep-info,metadata,link -C embed-bitcode=no -C debuginfo=2 --cfg "feature=\"chrono\"" --cfg "feature=\"coinit_apartmentthreaded\"" --cfg "feature=\"default\"" --check-cfg cfg(docsrs,test) --check-cfg "cfg(feature, values(\"chrono\", \"coinit_apartmentthreaded\", \"coinit_disable_ole1dde\", \"coinit_multithreaded\", \"coinit_speed_over_memory\", \"default\"))" -C metadata=5dc76665deea84d7 -C extra-filename=-8784c4db78adc3e9 --out-dir D:\a\explorer-rs\explorer-rs\target\debug\deps -L dependency=D:\a\explorer-rs\explorer-rs\target\debug\deps --extern log=D:\a\explorer-rs\explorer-rs\target\debug\deps\liblog-35f8c052278b030b.rmeta --extern scopeguard=D:\a\explorer-rs\explorer-rs\target\debug\deps\libscopeguard-73ccee13f2d93c4e.rmeta --extern windows=D:\a\explorer-rs\explorer-rs\target\debug\deps\libwindows-3a2bac647f2e429f.rmeta --cap-lints allow -L native=C:\Users\runneradmin\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\windows_x86_64_msvc-0.52.6\lib`
+     Running `C:\Users\runneradmin\.rustup\toolchains\stable-x86_64-pc-windows-msvc\bin\rustc.exe --crate-name explorer_rs --edition=2021 src\main.rs --error-format=json --json=diagnostic-rendered-ansi,artifacts,future-incompat --emit=dep-info,link -C embed-bitcode=no -C debuginfo=2 --test --check-cfg cfg(docsrs,test) --check-cfg "cfg(feature, values())" -C metadata=483fd02d3a61c442 -C extra-filename=-ce1c1b5ee32b6bd4 --out-dir D:\a\explorer-rs\explorer-rs\target\debug\deps -L dependency=D:\a\explorer-rs\explorer-rs\target\debug\deps --extern anyhow=D:\a\explorer-rs\explorer-rs\target\debug\deps\libanyhow-bdae92004037526c.rlib --extern chrono=D:\a\explorer-rs\explorer-rs\target\debug\deps\libchrono-7a7e22d69a1818cb.rlib --extern dirs=D:\a\explorer-rs\explorer-rs\target\debug\deps\libdirs-3f9a65b9bea2ce63.rlib --extern eframe=D:\a\explorer-rs\explorer-rs\target\debug\deps\libeframe-e353495f50c27147.rlib --extern egui=D:\a\explorer-rs\explorer-rs\target\debug\deps\libegui-da38f3b4ecf29bee.rlib --extern egui_extras=D:\a\explorer-rs\explorer-rs\target\debug\deps\libegui_extras-482ee7d7b0772e29.rlib --extern notify=D:\a\explorer-rs\explorer-rs\target\debug\deps\libnotify-09354964e274f3f1.rlib --extern open=D:\a\explorer-rs\explorer-rs\target\debug\deps\libopen-e53c158be9dcec02.rlib --extern rfd=D:\a\explorer-rs\explorer-rs\target\debug\deps\librfd-dba2d5d969a23c38.rlib --extern serde=D:\a\explorer-rs\explorer-rs\target\debug\deps\libserde-839e0fd2a4238dc7.rlib --extern serde_json=D:\a\explorer-rs\explorer-rs\target\debug\deps\libserde_json-9663196114ff8712.rlib --extern trash=D:\a\explorer-rs\explorer-rs\target\debug\deps\libtrash-8784c4db78adc3e9.rlib --extern walkdir=D:\a\explorer-rs\explorer-rs\target\debug\deps\libwalkdir-7064e09c994d9e76.rlib --extern windows=D:\a\explorer-rs\explorer-rs\target\debug\deps\libwindows-895198826adf7fd7.rlib -L native=D:\a\explorer-rs\explorer-rs\target\debug\build\ring-d59ab82cdceb3675\out -L native=C:\Users\runneradmin\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\windows_x86_64_msvc-0.48.5\lib -L native=C:\Users\runneradmin\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\windows_x86_64_msvc-0.53.1\lib -L native=C:\Users\runneradmin\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\windows_x86_64_msvc-0.52.6\lib -C link-arg=D:\a\explorer-rs\explorer-rs\target\debug\build\explorer-rs-ca19b7e40d34a545\out\resource.res`
+     Running `C:\Users\runneradmin\.rustup\toolchains\stable-x86_64-pc-windows-msvc\bin\rustc.exe --crate-name windows_bench --edition=2021 tests\windows_bench.rs --error-format=json --json=diagnostic-rendered-ansi,artifacts,future-incompat --emit=dep-info,link -C embed-bitcode=no -C debuginfo=2 --test --check-cfg cfg(docsrs,test) --check-cfg "cfg(feature, values())" -C metadata=e4b27e5690c50fca -C extra-filename=-501ab3bcba19285f --out-dir D:\a\explorer-rs\explorer-rs\target\debug\deps -L dependency=D:\a\explorer-rs\explorer-rs\target\debug\deps --extern anyhow=D:\a\explorer-rs\explorer-rs\target\debug\deps\libanyhow-bdae92004037526c.rlib --extern chrono=D:\a\explorer-rs\explorer-rs\target\debug\deps\libchrono-7a7e22d69a1818cb.rlib --extern dirs=D:\a\explorer-rs\explorer-rs\target\debug\deps\libdirs-3f9a65b9bea2ce63.rlib --extern eframe=D:\a\explorer-rs\explorer-rs\target\debug\deps\libeframe-e353495f50c27147.rlib --extern egui=D:\a\explorer-rs\explorer-rs\target\debug\deps\libegui-da38f3b4ecf29bee.rlib --extern egui_extras=D:\a\explorer-rs\explorer-rs\target\debug\deps\libegui_extras-482ee7d7b0772e29.rlib --extern notify=D:\a\explorer-rs\explorer-rs\target\debug\deps\libnotify-09354964e274f3f1.rlib --extern open=D:\a\explorer-rs\explorer-rs\target\debug\deps\libopen-e53c158be9dcec02.rlib --extern rfd=D:\a\explorer-rs\explorer-rs\target\debug\deps\librfd-dba2d5d969a23c38.rlib --extern serde=D:\a\explorer-rs\explorer-rs\target\debug\deps\libserde-839e0fd2a4238dc7.rlib --extern serde_json=D:\a\explorer-rs\explorer-rs\target\debug\deps\libserde_json-9663196114ff8712.rlib --extern trash=D:\a\explorer-rs\explorer-rs\target\debug\deps\libtrash-8784c4db78adc3e9.rlib --extern walkdir=D:\a\explorer-rs\explorer-rs\target\debug\deps\libwalkdir-7064e09c994d9e76.rlib --extern windows=D:\a\explorer-rs\explorer-rs\target\debug\deps\libwindows-895198826adf7fd7.rlib -L native=D:\a\explorer-rs\explorer-rs\target\debug\build\ring-d59ab82cdceb3675\out -L native=C:\Users\runneradmin\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\windows_x86_64_msvc-0.48.5\lib -L native=C:\Users\runneradmin\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\windows_x86_64_msvc-0.53.1\lib -L native=C:\Users\runneradmin\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\windows_x86_64_msvc-0.52.6\lib -C link-arg=D:\a\explorer-rs\explorer-rs\target\debug\build\explorer-rs-ca19b7e40d34a545\out\resource.res`
+     Running `C:\Users\runneradmin\.rustup\toolchains\stable-x86_64-pc-windows-msvc\bin\rustc.exe --crate-name explorer_rs --edition=2021 src\main.rs --error-format=json --json=diagnostic-rendered-ansi,artifacts,future-incompat --crate-type bin --emit=dep-info,link -C embed-bitcode=no -C debuginfo=2 --check-cfg cfg(docsrs,test) --check-cfg "cfg(feature, values())" -C metadata=d88872645ec4510e --out-dir D:\a\explorer-rs\explorer-rs\target\debug\deps -L dependency=D:\a\explorer-rs\explorer-rs\target\debug\deps --extern anyhow=D:\a\explorer-rs\explorer-rs\target\debug\deps\libanyhow-bdae92004037526c.rlib --extern chrono=D:\a\explorer-rs\explorer-rs\target\debug\deps\libchrono-7a7e22d69a1818cb.rlib --extern dirs=D:\a\explorer-rs\explorer-rs\target\debug\deps\libdirs-3f9a65b9bea2ce63.rlib --extern eframe=D:\a\explorer-rs\explorer-rs\target\debug\deps\libeframe-e353495f50c27147.rlib --extern egui=D:\a\explorer-rs\explorer-rs\target\debug\deps\libegui-da38f3b4ecf29bee.rlib --extern egui_extras=D:\a\explorer-rs\explorer-rs\target\debug\deps\libegui_extras-482ee7d7b0772e29.rlib --extern notify=D:\a\explorer-rs\explorer-rs\target\debug\deps\libnotify-09354964e274f3f1.rlib --extern open=D:\a\explorer-rs\explorer-rs\target\debug\deps\libopen-e53c158be9dcec02.rlib --extern rfd=D:\a\explorer-rs\explorer-rs\target\debug\deps\librfd-dba2d5d969a23c38.rlib --extern serde=D:\a\explorer-rs\explorer-rs\target\debug\deps\libserde-839e0fd2a4238dc7.rlib --extern serde_json=D:\a\explorer-rs\explorer-rs\target\debug\deps\libserde_json-9663196114ff8712.rlib --extern trash=D:\a\explorer-rs\explorer-rs\target\debug\deps\libtrash-8784c4db78adc3e9.rlib --extern walkdir=D:\a\explorer-rs\explorer-rs\target\debug\deps\libwalkdir-7064e09c994d9e76.rlib --extern windows=D:\a\explorer-rs\explorer-rs\target\debug\deps\libwindows-895198826adf7fd7.rlib -L native=D:\a\explorer-rs\explorer-rs\target\debug\build\ring-d59ab82cdceb3675\out -L native=C:\Users\runneradmin\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\windows_x86_64_msvc-0.48.5\lib -L native=C:\Users\runneradmin\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\windows_x86_64_msvc-0.53.1\lib -L native=C:\Users\runneradmin\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\windows_x86_64_msvc-0.52.6\lib -C link-arg=D:\a\explorer-rs\explorer-rs\target\debug\build\explorer-rs-ca19b7e40d34a545\out\resource.res`
+warning: variable does not need to be mutable
+   --> src\shell.rs:209:13
+    |
+209 |         let mut width = bm.bmWidth;
+    |             ----^^^^^
+    |             |
+    |             help: remove this `mut`
+    |
+    = note: `#[warn(unused_mut)]` (part of `#[warn(unused)]`) on by default
+
+warning: variants `CopyName` and `FocusFilter` are never constructed
+  --> src\commands.rs:29:5
+   |
+10 | pub enum Command {
+   |          ------- variants in this enum
+...
+29 |     CopyName,
+   |     ^^^^^^^^
+...
+37 |     FocusFilter,
+   |     ^^^^^^^^^^^
+   |
+   = note: `Command` has derived impls for the traits `Clone` and `Debug`, but these are intentionally ignored during dead code analysis
+   = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: field `ok` is never read
+  --> src\commands.rs:44:17
+   |
+44 |     PasteDone { ok: usize, err: usize, message: String },
+   |     ---------   ^^
+   |     |
+   |     field in this variant
+   |
+   = note: `BgEvent` has a derived impl for the trait `Debug`, but this is intentionally ignored during dead code analysis
+
+warning: associated function `resolved_path` is never used
+   --> src\config.rs:192:12
+    |
+ 88 | impl AppConfig {
+    | -------------- associated function in this implementation
+...
+192 |     pub fn resolved_path() -> Option<PathBuf> {
+    |            ^^^^^^^^^^^^^
+
+warning: struct `CacheKey` is never constructed
+  --> src\file_icons.rs:21:12
+   |
+21 | pub struct CacheKey(pub String);
+   |            ^^^^^^^^
+
+warning: struct `LruIconCache` is never constructed
+  --> src\file_icons.rs:24:12
+   |
+24 | pub struct LruIconCache {
+   |            ^^^^^^^^^^^^
+
+warning: associated items `with_capacity`, `get`, `insert`, `len`, and `cap` are never used
+  --> src\file_icons.rs:31:12
+   |
+30 | impl LruIconCache {
+   | ----------------- associated items in this implementation
+31 |     pub fn with_capacity(cap: usize) -> Self {
+   |            ^^^^^^^^^^^^^
+...
+39 |     pub fn get(&self, key: &CacheKey) -> Option<&egui::TextureHandle> {
+   |            ^^^
+...
+43 |     pub fn insert(&mut self, key: CacheKey, tex: egui::TextureHandle) {
+   |            ^^^^^^
+...
+58 |     pub fn len(&self) -> usize {
+   |            ^^^
+...
+62 |     pub fn cap(&self) -> usize {
+   |            ^^^
+
+warning: function `fallback_svg_bytes` is never used
+  --> src\file_icons.rs:68:8
+   |
+68 | pub fn fallback_svg_bytes(ext: &str, is_dir: bool) -> &'static [u8] {
+   |        ^^^^^^^^^^^^^^^^^^
+
+warning: function `cache_key_for` is never used
+  --> src\file_icons.rs:94:4
+   |
+94 | fn cache_key_for(path: &std::path::Path, is_dir: bool) -> CacheKey {
+   |    ^^^^^^^^^^^^^
+
+warning: function `load_for_path` is never used
+   --> src\file_icons.rs:114:8
+    |
+114 | pub fn load_for_path(
+    |        ^^^^^^^^^^^^^
+
+warning: function `sanitize_for_uri` is never used
+   --> src\file_icons.rs:145:4
+    |
+145 | fn sanitize_for_uri(s: &str) -> String {
+    |    ^^^^^^^^^^^^^^^^
+
+warning: function `svg_bytes_to_texture` is never used
+   --> src\file_icons.rs:149:4
+    |
+149 | fn svg_bytes_to_texture(ctx: &egui::Context, key: &str, svg: &[u8], size: u32) -> egui::TextureHandle {
+    |    ^^^^^^^^^^^^^^^^^^^^
+
+warning: function `normalize_path_input` is never used
+  --> src\fs_ops.rs:88:8
+   |
+88 | pub fn normalize_path_input(input: &str) -> PathBuf {
+   |        ^^^^^^^^^^^^^^^^^^^^
+
+warning: function `selected_total_size` is never used
+   --> src\fs_ops.rs:180:8
+    |
+180 | pub fn selected_total_size<'a, I>(entries: I) -> u64
+    |        ^^^^^^^^^^^^^^^^^^^
+
+warning: function `is_dir_via_attr` is never used
+   --> src\shell.rs:110:12
+    |
+110 |     pub fn is_dir_via_attr(path: &Path) -> bool {
+    |            ^^^^^^^^^^^^^^^
+
+warning: function `show_os_context_menu` is never used
+   --> src\shell.rs:129:12
+    |
+129 |     pub fn show_os_context_menu(_paths: &[PathBuf]) -> anyhow::Result<()> {
+    |            ^^^^^^^^^^^^^^^^^^^^
+
+warning: method `navigate_to_async` is never used
+   --> src\tab.rs:225:12
+    |
+ 84 | impl Tab {
+    | -------- method in this implementation
+...
+225 |     pub fn navigate_to_async(&mut self, path: PathBuf) -> bool {
+    |            ^^^^^^^^^^^^^^^^^
+
+warning: function `should_route_to_filter` is never used
+   --> src\typeahead_input.rs:130:8
+    |
+130 | pub fn should_route_to_filter(wants_keyboard: bool, typed: &str) -> bool {
+    |        ^^^^^^^^^^^^^^^^^^^^^^
+
+warning: `explorer-rs` (bin "explorer-rs" test) generated 11 warnings (11 duplicates)
+warning: `explorer-rs` (bin "explorer-rs") generated 18 warnings (run `cargo fix --bin "explorer-rs" -p explorer-rs` to apply 1 suggestion)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 1m 23s
+     Running `D:\a\explorer-rs\explorer-rs\target\debug\deps\explorer_rs-ce1c1b5ee32b6bd4.exe`
+
+running 30 tests
+test config::tests::default_sort ... ok
+test config::tests::default_font_is_biz_ud_gothic ... ok
+test config::tests::portable_path_is_preferred ... ok
+test config::tests::old_config_without_font_fields_deserializes ... ok
+test config::tests::push_recent_dedupes_and_caps ... ok
+test file_icons::tests::fallback_svg_nonempty ... ok
+test config::tests::roundtrip_json ... ok
+test fs_ops::tests::humansize_basic ... ok
+test fs_ops::tests::normalize_accepts_both_separators ... ok
+test fs_ops::tests::sanitize_rejects_traversal ... ok
+test fs_ops::tests::truncate_chars_safe ... ok
+test nat_sort::tests::case_insensitive_letters ... ok
+test file_icons::tests::lru_evicts_oldest ... ok
+test nat_sort::tests::mixed ... ok
+test nat_sort::tests::numbers_in_names ... ok
+test shell::tests::long_path_identity_for_short ... ok
+test shell::tests::normalize_both_separators ... ok
+test shell::tests::normalize_trims ... ok
+test fs_ops::tests::copy_and_move_roundtrip ... ok
+test tab::tests::list_blocking_filters_hidden ... ok
+test tab::tests::move_focus_by_clamps ... ok
+test tab::tests::navigate_async_clears_without_list ... ok
+test tab::tests::multi_select_range ... ok
+test typeahead_input::tests::decide_clears_stale_typeahead ... ok
+test toolbar_icons::tests::svg_assets_nonempty ... ok
+test typeahead_input::tests::decide_defers_when_textedit_focused ... ok
+test typeahead_input::tests::decide_routes_ime_text_to_filter ... ok
+test typeahead_input::tests::route_to_filter_when_unfocused_and_typed ... ok
+test tab::tests::natural_name_order ... ok
+test tab::tests::sort_dirs_first ... ok
+
+test result: ok. 30 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+
+     Running `D:\a\explorer-rs\explorer-rs\target\debug\deps\windows_bench-501ab3bcba19285f.exe`
+
+running 1 test
+test bench_list_5k ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 3.51s
+
