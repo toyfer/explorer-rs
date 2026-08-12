@@ -1,0 +1,90 @@
+name: Fix file-icons app.rs via Actions
+
+on:
+  push:
+    branches: [feat/file-icons-11c]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  fix:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: feat/file-icons-11c
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Fetch main
+        run: git fetch origin main --depth 1
+
+      - name: Restore and wire app.rs
+        run: |
+          python3 << 'PY'
+          import pathlib, re, subprocess, sys
+          APP = pathlib.Path("src/app.rs")
+          text = APP.read_text(encoding="utf-8")
+          lines = text.splitlines()
+          # Detect truncated (only header or orphan)
+          is_truncated = len(lines) < 200 or "impl ExplorerApp" not in text or text.count("fn ") < 8
+          has_orphan = "format!(\"ext:{ext}\")" in text and text.count("format!(\"ext:{ext}\")") >= 1
+          # Check if truncated header only (27 lines)
+          if is_truncated:
+              print(f"Detected truncated app.rs ({len(lines)} lines), restoring from origin/main")
+              restored = subprocess.check_output(["git", "show", "origin/main:src/app.rs"], text=True)
+              text = restored
+              print(f"Restored {len(text.splitlines())} lines from main")
+          # Remove orphan fragment if present (stray outside fn)
+          # The orphan is the standalone block after clear_typeahead, not inside icon_cache_key
+          stray = "    let ext = path\n            .extension()\n            .and_then(|s| s.to_str())\n            .unwrap_or(\"\")\n            .to_lowercase();\n        if ext == \"exe\" || ext == \"ico\" || ext == \"lnk\" {\n            return format!(\"file:{}\", path.display());\n        }\n        format!(\"ext:{ext}\")\n    }"
+          if stray in text:
+              # Only remove if it appears as orphan (outside icon_cache_key)
+              # Count how many times icon_cache_key appears
+              # The stray should appear exactly once as orphan + once inside correct fn
+              count_before = text.count(stray)
+              text = text.replace(stray, "", 1)
+              print(f"Removed orphan stray (count before {count_before})")
+          # Wire icon_cache type to LruIconCache
+          if "HashMap<String, egui::TextureHandle>" in text:
+              text = text.replace(
+                  "icon_cache: RefCell<HashMap<String, egui::TextureHandle>>",
+                  "icon_cache: RefCell<crate::file_icons::LruIconCache>"
+              )
+              print("Replaced icon_cache type")
+          if "RefCell::new(HashMap::new())" in text:
+              text = text.replace(
+                  "icon_cache: RefCell::new(HashMap::new())",
+                  "icon_cache: RefCell::new(crate::file_icons::LruIconCache::with_capacity(512))"
+              )
+              print("Replaced icon_cache init")
+          # Wire get_or_load_icon
+          marker = "crate::file_icons::load_for_path"
+          if marker not in text:
+              old = "    fn get_or_load_icon(\n        &self,\n        ctx: &egui::Context,\n        path: &Path,\n        is_dir: bool,\n    ) -> Option<egui::TextureHandle> {\n        let key = Self::icon_cache_key(path, is_dir);\n        if let Some(h) = self.icon_cache.borrow().get(&key) {\n            return Some(h.clone());\n        }\n        #[cfg(windows)]\n        {\n            if let Some((rgba, w, h)) = shell::icon_rgba(path, is_dir) {\n                if w > 0 && h > 0 && rgba.len() == (w * h * 4) as usize {\n                    let img =\n                        egui::ColorImage::from_rgba_unmultiplied([w as usize, h as usize], &rgba);\n                    let tex = ctx.load_texture(key.clone(), img, egui::TextureOptions::LINEAR);\n                    self.icon_cache.borrow_mut().insert(key.clone(), tex.clone());\n                    return Some(tex);\n                }\n            }\n        }\n        let _ = (ctx, path, is_dir);\n        None\n    }"
+              new = "    fn get_or_load_icon(\n        &self,\n        ctx: &egui::Context,\n        path: &Path,\n        is_dir: bool,\n    ) -> Option<egui::TextureHandle> {\n        // Context7 (PR #11 slice C): SHGetFileInfo via shell::icon_rgba is the\n        // preferred path; on miss, file_icons::load_for_path falls back to\n        // bundled MIT-licensed SVGs with LRU 512 cache.\n        let key = Self::icon_cache_key(path, is_dir);\n        if let Some(h) = self.icon_cache.borrow().get(&key) {\n            return Some(h.clone());\n        }\n        if let Some(tex) = crate::file_icons::load_for_path(ctx, &self.icon_cache, path, is_dir) {\n            return Some(tex);\n        }\n        let _ = key;\n        None\n    }"
+              if old in text:
+                  text = text.replace(old, new, 1)
+                  print("Wired get_or_load_icon")
+              else:
+                  print("WARNING: old get_or_load_icon block not found", file=sys.stderr)
+          else:
+              print("get_or_load_icon already wired")
+          APP.write_text(text, encoding="utf-8")
+          print(f"Final app.rs lines: {len(text.splitlines())}")
+          PY
+
+      - name: Commit if changed
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/app.rs
+          if git diff --staged --quiet; then
+            echo "No changes to commit"
+          else
+            git commit -m "fix(file_icons): restore app.rs via Actions (truncate+orphan) and wire LruCache [Context7]"
+            git push
+          fi
