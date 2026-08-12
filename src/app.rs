@@ -1248,23 +1248,45 @@ impl eframe::App for ExplorerApp {
             ui.horizontal_wrapped(|ui| {
                 let back_ok = !self.current_tab().history_back.is_empty();
                 let fwd_ok = !self.current_tab().history_forward.is_empty();
-                ui.add_enabled_ui(back_ok, |ui| {
-                    if ui.button(btn("◀")).on_hover_text("戻る").clicked() {
-                        self.run_command(Command::GoBack);
-                    }
-                });
-                ui.add_enabled_ui(fwd_ok, |ui| {
-                    if ui.button(btn("▶")).on_hover_text("進む").clicked() {
-                        self.run_command(Command::GoForward);
-                    }
-                });
-                if ui.button(btn("⬆")).on_hover_text("上へ Alt+↑").clicked() {
+                // Context7: SVG via egui_extras image loaders (install_image_loaders in main)
+                if crate::toolbar_icons::icon_button(
+                    ui,
+                    crate::toolbar_icons::ToolbarIcon::Back,
+                    back_ok,
+                    compact,
+                ) {
+                    self.run_command(Command::GoBack);
+                }
+                if crate::toolbar_icons::icon_button(
+                    ui,
+                    crate::toolbar_icons::ToolbarIcon::Forward,
+                    fwd_ok,
+                    compact,
+                ) {
+                    self.run_command(Command::GoForward);
+                }
+                if crate::toolbar_icons::icon_button(
+                    ui,
+                    crate::toolbar_icons::ToolbarIcon::Up,
+                    true,
+                    compact,
+                ) {
                     self.run_command(Command::GoUp);
                 }
-                if ui.button(btn("⟳")).on_hover_text("更新 F5").clicked() {
+                if crate::toolbar_icons::icon_button(
+                    ui,
+                    crate::toolbar_icons::ToolbarIcon::Refresh,
+                    true,
+                    compact,
+                ) {
                     self.run_command(Command::Refresh);
                 }
-                if ui.button(btn("🏠")).on_hover_text("ホーム Alt+Home").clicked() {
+                if crate::toolbar_icons::icon_button(
+                    ui,
+                    crate::toolbar_icons::ToolbarIcon::Home,
+                    true,
+                    compact,
+                ) {
                     self.run_command(Command::GoHome);
                 }
                 ui.separator();
