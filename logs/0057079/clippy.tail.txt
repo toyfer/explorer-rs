@@ -1,0 +1,100 @@
+   Compiling explorer-rs v0.1.4 (D:\a\explorer-rs\explorer-rs)
+warning: manual `Range::contains` implementation
+   --> build.rs:104:28
+    |
+104 |     let is_tab = ty < 6 && x >= 2 && x < 14;
+    |                            ^^^^^^^^^^^^^^^^ help: use: `(2..14).contains(&x)`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.97.0/index.html#manual_range_contains
+    = note: `-W clippy::manual-range-contains` implied by `-W clippy::all`
+    = help: to override `-W clippy::all` add `#[allow(clippy::manual_range_contains)]`
+
+warning: manual `Range::contains` implementation
+   --> build.rs:105:41
+    |
+105 |     let is_body = ty >= 6 && ty < 28 && x >= 2 && x < 30;
+    |                                         ^^^^^^^^^^^^^^^^ help: use: `(2..30).contains(&x)`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.97.0/index.html#manual_range_contains
+
+warning: manual `Range::contains` implementation
+   --> build.rs:105:19
+    |
+105 |     let is_body = ty >= 6 && ty < 28 && x >= 2 && x < 30;
+    |                   ^^^^^^^^^^^^^^^^^^ help: use: `(6..28).contains(&ty)`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.97.0/index.html#manual_range_contains
+
+warning: manual `Range::contains` implementation
+   --> build.rs:114:36
+    |
+114 |         if ty >= 12 && ty <= 13 && x >= 6 && x < 26 { return (255, 255, 255, 230); }
+    |                                    ^^^^^^^^^^^^^^^^ help: use: `(6..26).contains(&x)`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.97.0/index.html#manual_range_contains
+
+warning: manual `RangeInclusive::contains` implementation
+   --> build.rs:114:12
+    |
+114 |         if ty >= 12 && ty <= 13 && x >= 6 && x < 26 { return (255, 255, 255, 230); }
+    |            ^^^^^^^^^^^^^^^^^^^^ help: use: `(12..=13).contains(&ty)`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.97.0/index.html#manual_range_contains
+
+warning: manual `Range::contains` implementation
+   --> build.rs:115:36
+    |
+115 |         if ty >= 16 && ty <= 17 && x >= 6 && x < 26 { return (255, 255, 255, 230); }
+    |                                    ^^^^^^^^^^^^^^^^ help: use: `(6..26).contains(&x)`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.97.0/index.html#manual_range_contains
+
+warning: manual `RangeInclusive::contains` implementation
+   --> build.rs:115:12
+    |
+115 |         if ty >= 16 && ty <= 17 && x >= 6 && x < 26 { return (255, 255, 255, 230); }
+    |            ^^^^^^^^^^^^^^^^^^^^ help: use: `(16..=17).contains(&ty)`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.97.0/index.html#manual_range_contains
+
+warning: manual `Range::contains` implementation
+   --> build.rs:116:36
+    |
+116 |         if ty >= 20 && ty <= 21 && x >= 6 && x < 20 { return (255, 255, 255, 230); }
+    |                                    ^^^^^^^^^^^^^^^^ help: use: `(6..20).contains(&x)`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.97.0/index.html#manual_range_contains
+
+warning: manual `RangeInclusive::contains` implementation
+   --> build.rs:116:12
+    |
+116 |         if ty >= 20 && ty <= 21 && x >= 6 && x < 20 { return (255, 255, 255, 230); }
+    |            ^^^^^^^^^^^^^^^^^^^^ help: use: `(20..=21).contains(&ty)`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.97.0/index.html#manual_range_contains
+
+warning: `explorer-rs` (build script) generated 9 warnings
+warning: explorer-rs@0.1.4: embedded icon D:\a\explorer-rs\explorer-rs\target\debug\build\explorer-rs-8101302ed1f8e39f\out\generated_icon.ico
+error: this file contains an unclosed delimiter
+    --> src\app.rs:2166:3
+     |
+  70 | impl ExplorerApp {
+     |                  - unclosed delimiter
+...
+ 321 |     fn icon_cache_key(path: &Path, is_dir: bool) -> String {
+     |                                                            - this delimiter might not be properly closed...
+...
+ 371 |             TypeaheadAction::None => {}
+     |                                      -- block is empty, you might have not meant to close it
+...
+1095 | }
+     | - ...as it matches this but it has different indentation
+...
+2166 | }
+     |  ^
+
+warning: explorer-rs@0.1.4: embedded icon D:\a\explorer-rs\explorer-rs\target\debug\build\explorer-rs-8101302ed1f8e39f\out\generated_icon.ico
+error: could not compile `explorer-rs` (bin "explorer-rs" test) due to 1 previous error
+warning: build failed, waiting for other jobs to finish...
+warning: explorer-rs@0.1.4: embedded icon D:\a\explorer-rs\explorer-rs\target\debug\build\explorer-rs-8101302ed1f8e39f\out\generated_icon.ico
+error: could not compile `explorer-rs` (bin "explorer-rs") due to 1 previous error
