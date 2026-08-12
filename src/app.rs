@@ -46,7 +46,7 @@ pub struct ExplorerApp {
     listing_p2: bool,
     bg_tx: BgSender,
     bg_rx: BgReceiver,
-    icon_cache: RefCell<HashMap<String, egui::TextureHandle>>,
+    icon_cache: RefCell<crate::file_icons::LruIconCache>,
     focus_request: Option<FocusTarget>,
     scroll_to_row: Option<usize>,
     rename_focus_once: bool,
@@ -114,7 +114,7 @@ impl ExplorerApp {
             listing_p2: false,
             bg_tx,
             bg_rx,
-            icon_cache: RefCell::new(HashMap::new()),
+            icon_cache: RefCell::new(crate::file_icons::LruIconCache::with_capacity(512)),
             focus_request: None,
             scroll_to_row: None,
             rename_focus_once: false,
@@ -318,10 +318,6 @@ impl ExplorerApp {
         self.typeahead.clear();
         self.typeahead_at = None;
     }
-    fn icon_cache_key(path: &Path, is_dir: bool) -> String {
-        if is_dir {
-            return "__dir__".to_string();
-        }
         let ext = path
             .extension()
             .and_then(|s| s.to_str())
@@ -338,24 +334,8 @@ impl ExplorerApp {
         path: &Path,
         is_dir: bool,
     ) -> Option<egui::TextureHandle> {
-        let key = Self::icon_cache_key(path, is_dir);
-        if let Some(h) = self.icon_cache.borrow().get(&key) {
-            return Some(h.clone());
-        }
-        #[cfg(windows)]
-        {
-            if let Some((rgba, w, h)) = shell::icon_rgba(path, is_dir) {
-                if w > 0 && h > 0 && rgba.len() == (w * h * 4) as usize {
-                    let img =
-                        egui::ColorImage::from_rgba_unmultiplied([w as usize, h as usize], &rgba);
-                    let tex = ctx.load_texture(key.clone(), img, egui::TextureOptions::LINEAR);
-                    self.icon_cache.borrow_mut().insert(key.clone(), tex.clone());
-                    return Some(tex);
-                }
-            }
-        }
-        let _ = (ctx, path, is_dir);
-        None
+        // Context7: file_icons LRU 512 + Windows SHGetFileInfo + MIT SVG fallback
+        crate::file_icons::load_for_path(ctx, &self.icon_cache, path, is_dir)
     }
     fn handle_typeahead(&mut self, ctx: &egui::Context) {
         // Context7: Event::Text is primary (IME commit); unfocused printable → filter.
