@@ -1,0 +1,8 @@
+# Third-party licenses
+
+## assets/icons/files/*.svg and assets/icons/toolbar/*.svg
+
+These are simple stroke-only icons hand-authored for this project.
+Released under the MIT License (same as the main project, see LICENSE-MIT).
+
+No external icon pack is bundled. The fallback path uses bundled SVGs only.

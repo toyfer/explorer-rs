@@ -1,0 +1,34 @@
+name: Apply file icons wire
+
+on:
+  push:
+    branches: [feat/file-icons-11c]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          ref: feat/file-icons-11c
+
+      - name: Apply patch to app.rs
+        run: python3 scripts/apply_file_icons.py
+
+      - name: Commit if changed
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/app.rs
+          if git diff --staged --quiet; then
+            echo "No changes"
+          else
+            git commit -m "feat(icons): wire get_or_load_icon to file_icons LRU (Context7)"
+            git push
+          fi
