@@ -32,7 +32,7 @@ impl LruIconCache {
         Self {
             map: HashMap::new(),
             order: VecDeque::new(),
-            cap: cap.max(16),
+            cap: cap.max(1),
         }
     }
 
