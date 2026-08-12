@@ -322,7 +322,17 @@ impl ExplorerApp {
         if is_dir {
             return "__dir__".to_string();
         }
-    
+        let ext = path
+            .extension()
+            .and_then(|s| s.to_str())
+            .unwrap_or("")
+            .to_lowercase();
+        if ext == "exe" || ext == "ico" || ext == "lnk" {
+            return format!("file:{}", path.display());
+        }
+        format!("ext:{ext}")
+    }
+
     fn get_or_load_icon(
         &self,
         ctx: &egui::Context,
